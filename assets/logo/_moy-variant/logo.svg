@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="14 44 376 136">
+  <title>СоюзНефтеГаз — логотип Поток</title>
+  <g transform="translate(30,56) scale(0.93333)">
+  <path d="M78.94 27.23A40 40 0 1 0 78.94 92.77" style="fill:none;stroke:#111A20" stroke-width="14"/>
+  <path d="M76 46L110 60L76 74Z" style="fill:#0091D0"/>
+  </g>
+  <text x="154" y="106" font-family="Manrope, Segoe UI, Arial, sans-serif" font-weight="700" font-size="32" style="fill:#111A20">СоюзНефтеГаз</text>
+  <text x="154" y="138" text-anchor="start" font-family="Consolas, JetBrains Mono, monospace" font-size="10.5" letter-spacing="3.0" fill-opacity=".55" style="fill:#111A20">ОТ СКЛАДА ДО ОБЪЕКТА</text>
+</svg>
