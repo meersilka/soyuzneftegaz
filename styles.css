@@ -328,6 +328,9 @@ a:hover { color: var(--action-700); }
   display: grid; place-items: center; border-bottom: 1px solid var(--line-2); padding: var(--s-3);
 }
 .card__media svg { width: auto; height: 100%; max-width: 100%; }
+/* фото сняты на белом фоне — подложку карточки под них тоже осветляем */
+.card__media--photo { background: #FFFFFF; }
+.card__media img { max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain; }
 .card__body { padding: var(--s-4); display: flex; flex-direction: column; gap: 6px; flex: 1; }
 .card__title {
   font-weight: 700; font-size: 0.9375rem; line-height: 1.35; color: var(--ink);
@@ -593,6 +596,16 @@ a.card__title:hover { color: var(--action); }
 .table tbody tr + tr td { border-top: 1px solid var(--line-2); }
 .table tbody tr:hover td { background: #FAFCFD; }
 .table td.num, .table th.num { text-align: right; font-family: var(--mono); }
+/* колонка с фотографией изделия */
+.th-photo, .td-photo { width: 76px; padding-right: 0; }
+.td-photo a { display: block; }
+.thumb {
+  display: block; width: 62px; height: 46px; object-fit: contain;
+  background: #FFFFFF; border: 1px solid var(--line-2); border-radius: var(--r-1);
+}
+/* у проката фотографий нет — в ячейке остаётся сечение профиля */
+.thumb--draw { display: grid; place-items: center; padding: 3px; }
+.thumb--draw svg { width: 100%; height: 100%; }
 .table__name { font-weight: 700; color: var(--ink); text-decoration: none; overflow-wrap: anywhere;
   -webkit-hyphens: auto; hyphens: auto; }
 a.table__name:hover { color: var(--action); }
@@ -665,6 +678,7 @@ a.table__name:hover { color: var(--action); }
     border-bottom: 0; border-right: 1px solid var(--line-2);
   }
   .result-cards .card__media svg { width: 100%; height: auto; }
+  .result-cards .card__media img { max-width: 100%; max-height: 76px; }
   .result-cards .card__body { padding: var(--s-3); gap: 4px; }
   .result-cards .card__foot { padding-top: var(--s-2); }
   .result-cards .price { font-size: 1rem; }
@@ -689,6 +703,10 @@ a.table__name:hover { color: var(--action); }
   background-size: 24px 24px;
 }
 .pdp__figure svg { position: relative; width: 100%; max-height: 280px; }
+.pdp__figure--photo { background: #FFFFFF; display: grid; justify-items: center; gap: var(--s-3); }
+.pdp__figure--photo::before { content: none; }
+.pdp__figure img { position: relative; max-width: 100%; max-height: 320px; object-fit: contain; }
+.pdp__cap { font-size: var(--fs-xs); color: var(--muted); text-align: center; }
 
 .price-ladder { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); }
 .price-ladder th, .price-ladder td { padding: 9px 12px; border-top: 1px solid var(--line-2); }

@@ -47,7 +47,7 @@
     brand:   "СоюзНефтеГаз",
     short:   "ООО «СоюзНефтеГаз»",
     full:    "Общество с ограниченной ответственностью «СОЮЗНЕФТЕГАЗ»",
-    tagline: "Производственно-коммерческое предприятие",
+    tagline: "Торгово-производственная компания",
     inn: "7448175704",
     kpp: "744801001",
     ogrn: "1157448001358",
@@ -362,6 +362,20 @@
       '<text x="110" y="136" text-anchor="middle" font-family="JetBrains Mono, monospace" ' +
       'font-size="11" letter-spacing="1.4" fill="' + C_DIM + '">' + esc(s.size || "") + "</text>";
     return svgWrap(body + label);
+  }
+
+  /* Фотография изделия из «Каталога продукции 2015».
+     Снимок один на тип: по диаметрам каталог отдельных фото не даёт.
+     Там, где фото нет (прокат), по-прежнему рисуем сечение. */
+  function photoHtml(s) {
+    return '<img src="assets/photo/' + attr(String(s.photo) + ".jpg") + '" alt="' +
+      attr(String(s.name)) + '" loading="lazy" decoding="async" />';
+  }
+  function mediaHtml(s) { return s.photo ? photoHtml(s) : profileSvg(s); }
+  function thumbHtml(s) {
+    if (!s.photo) return '<span class="thumb thumb--draw">' + profileSvg(s) + "</span>";
+    return '<img class="thumb" src="assets/photo/sm/' + attr(String(s.photo) + ".jpg") +
+      '" alt="" loading="lazy" decoding="async" />';
   }
 
   /* иконки групп каталога */
@@ -1257,7 +1271,7 @@
     const other = WH_KEYS.filter(function (w) { return w !== state.wh && stockAt(s, w) > 0; });
     return (
       '<article class="card">' +
-        '<div class="card__media">' + profileSvg(s) + "</div>" +
+        '<div class="card__media' + (s.photo ? " card__media--photo" : "") + '">' + mediaHtml(s) + "</div>" +
         '<div class="card__body">' +
           '<p class="eyebrow">' + esc(s.l2) + "</p>" +
           '<a class="card__title" href="#/product/' + encodeURIComponent(s.id) + '">' + esc(s.name) + "</a>" +
@@ -1459,6 +1473,7 @@
                 '<div class="result-table table-scroll">' +
                   '<table class="table">' +
                     "<thead><tr>" +
+                      '<th scope="col" class="th-photo"><span class="visually-hidden">Фото</span></th>' +
                       sortHead("name", "Наименование") +
                       '<th scope="col">Марка / размер</th>' +
                       sortHead("stock", "Наличие") +
@@ -1468,6 +1483,10 @@
                     shown.map(function (s) {
                       return (
                         "<tr>" +
+                          '<td class="td-photo">' +
+                            '<a href="#/product/' + encodeURIComponent(s.id) + '" tabindex="-1" aria-hidden="true">' +
+                              thumbHtml(s) +
+                            "</a></td>" +
                           '<td><a class="table__name" href="#/product/' + encodeURIComponent(s.id) + '">' + esc(s.name) + "</a>" +
                             '<div class="xs muted">' + esc(subLabel(s)) + "</div></td>" +
                           "<td>" + esc(s.mark) + '<div class="xs muted">' + esc(s.size) + "</div></td>" +
@@ -1534,7 +1553,10 @@
         ]) +
         '<div class="pdp">' +
           "<div>" +
-            '<figure class="pdp__figure" style="margin:0">' + profileSvg(s) + "</figure>" +
+            '<figure class="pdp__figure' + (s.photo ? " pdp__figure--photo" : "") + '" style="margin:0">' +
+              mediaHtml(s) +
+              (s.photo ? '<figcaption class="pdp__cap">Фото из каталога продукции 2015 года</figcaption>' : "") +
+            "</figure>" +
             '<div class="panel" style="margin-top:16px">' +
               "<h2 style=\"font-size:1.0625rem\">Характеристики</h2>" +
               '<table class="table table--plain" style="margin-top:12px"><tbody>' +
@@ -1646,6 +1668,7 @@
             '<div class="panel" style="margin-top:16px">' +
               (byReq(s)
                 ? '<p class="small"><b>Откуда характеристики.</b> Из каталога продукции ООО «СоюзНефтеГаз». ' +
+                  "Оттуда же фотография: она показывает тип изделия, исполнение уточняем при заказе. " +
                   "Цен и остатков в каталоге нет, поэтому здесь мы их не показываем.</p>"
                 : '<p class="small"><b>Что входит в цену.</b> Цена за тонну по теоретическому весу ГОСТ. ' +
                   "Итоговая сумма считается после весовой, разницу видно в УПД. Резка и упаковка — отдельные строки.</p>") +
