@@ -47,7 +47,7 @@
     brand:   "СоюзНефтеГаз",
     short:   "ООО «СоюзНефтеГаз»",
     full:    "Общество с ограниченной ответственностью «СОЮЗНЕФТЕГАЗ»",
-    tagline: "От склада до объекта",
+    tagline: "Производственно-коммерческое предприятие",
     inn: "7448175704",
     kpp: "744801001",
     ogrn: "1157448001358",
@@ -395,17 +395,20 @@
     return '<svg viewBox="0 0 68 68" aria-hidden="true" focusable="false">' + inner + "</svg>";
   }
 
-  /* ---------- 4б. Объёмный просмотр профиля ----------
+  /* ---------- 4б. Объёмная сборка изделия ----------
      Свой маленький рендерер на canvas: без внешних библиотек,
-     чтобы сайт по-прежнему работал без интернета и открывался файлом. */
+     чтобы сайт по-прежнему работал без интернета и открывался файлом.
+     Модель не просто вращается — детали прилетают по очереди и собираются
+     в изделие, а свежий срез металла остывает с оранжевого до синего. */
 
   const SHAPES = [
-    ["beam",  "Двутавр", "Балка двутавровая"],
-    ["pipe",  "Труба",   "Труба круглого сечения"],
-    ["angle", "Уголок",  "Уголок равнополочный"],
-    ["sheet", "Лист",    "Лист горячекатаный"]
+    ["valve",  "Кран",   "Кран шаровой фланцевый в сборе"],
+    ["elbow",  "Отвод",  "Отвод 90° с фланцами"],
+    ["flange", "Фланец", "Фланец с крепёжными болтами"],
+    ["bolt",   "Крепёж", "Болт с шайбой и гайкой"],
+    ["beam",   "Двутавр", "Балка двутавровая"]
   ];
-  let heroShape = "beam";
+  let heroShape = "valve";
   let heroViewer = null;
 
   function heroViewerHtml() {
@@ -417,7 +420,7 @@
             'aria-label="Объёмная модель: ' + attr(cur[2]) + '. Потяните мышью или стрелками, чтобы повернуть"></canvas>' +
           '<span class="viewer__hint" id="heroHint">Потяните, чтобы повернуть</span>' +
         "</div>" +
-        '<div class="segmented viewer__tabs" role="group" aria-label="Какой профиль показать">' +
+        '<div class="segmented viewer__tabs" role="group" aria-label="Какое изделие показать">' +
           SHAPES.map(function (s) {
             return '<button type="button" data-shape="' + attr(s[0]) + '" aria-pressed="' +
               (s[0] === heroShape ? "true" : "false") + '">' + esc(s[1]) + "</button>";
@@ -425,14 +428,17 @@
         "</div>" +
         '<figcaption class="hero__figcap">' +
           '<span class="eyebrow" id="heroCap">' + esc(cur[2]) + "</span>" +
-          '<span class="eyebrow">' + esc(pos(SKU.filter(function (s) { return !byReq(s); }).length)) +
-            " на складе</span>" +
+          '<span class="eyebrow">' + esc(pos(SKU.length)) + " в каталоге</span>" +
         "</figcaption>" +
       "</figure>"
     );
   }
 
-  /* прямоугольный брусок: шесть четырёхугольных граней */
+  /* ---- примитивы: всё собирается из четырёх- и многоугольных граней ---- */
+
+  const TAU = Math.PI * 2;
+
+  /* прямоугольный брусок */
   function boxFaces(x0, y0, z0, x1, y1, z1) {
     const p = [
       [x0, y0, z0], [x1, y0, z0], [x1, y1, z0], [x0, y1, z0],
@@ -442,33 +448,177 @@
       .map(function (f) { return { v: f.map(function (k) { return p[k]; }), soft: false }; });
   }
 
-  function buildShape(kind) {
-    const L = 150;
-    let faces = [];
-    if (kind === "pipe") {
-      const R = 82, r = 62, N = 36;
-      for (let i = 0; i < N; i++) {
-        const a0 = (i / N) * Math.PI * 2, a1 = ((i + 1) / N) * Math.PI * 2;
-        const oA = [R * Math.cos(a0), R * Math.sin(a0)], oB = [R * Math.cos(a1), R * Math.sin(a1)];
-        const iA = [r * Math.cos(a0), r * Math.sin(a0)], iB = [r * Math.cos(a1), r * Math.sin(a1)];
-        faces.push({ v: [[oA[0], oA[1], -L], [oB[0], oB[1], -L], [oB[0], oB[1], L], [oA[0], oA[1], L]], soft: true });
-        faces.push({ v: [[iB[0], iB[1], -L], [iA[0], iA[1], -L], [iA[0], iA[1], L], [iB[0], iB[1], L]], soft: true });
-        faces.push({ v: [[oA[0], oA[1], -L], [iA[0], iA[1], -L], [iB[0], iB[1], -L], [oB[0], oB[1], -L]], soft: true });
-        faces.push({ v: [[oA[0], oA[1], L], [oB[0], oB[1], L], [iB[0], iB[1], L], [iA[0], iA[1], L]], soft: true });
-      }
-    } else if (kind === "angle") {
-      faces = faces
-        .concat(boxFaces(-65, -65, -L, -51, 65, L))
-        .concat(boxFaces(-51, -65, -L, 65, -51, L));
-    } else if (kind === "sheet") {
-      faces = boxFaces(-118, -9, -158, 118, 9, 158);
-    } else {
-      faces = faces
-        .concat(boxFaces(-56, -100, -L, 56, -86, L))
-        .concat(boxFaces(-56, 86, -L, 56, 100, L))
-        .concat(boxFaces(-6, -86, -L, 6, 86, L));
+  /* труба или сплошной цилиндр вдоль оси Z; r = 0 — сплошной */
+  function tubeFaces(R, r, z0, z1, N) {
+    const f = [];
+    const co = [], ci = [];
+    for (let i = 0; i <= N; i++) {
+      const a = (i / N) * TAU;
+      co.push([R * Math.cos(a), R * Math.sin(a)]);
+      ci.push([r * Math.cos(a), r * Math.sin(a)]);
     }
-    return faces;
+    for (let i = 0; i < N; i++) {
+      const A = co[i], B = co[i + 1];
+      f.push({ v: [[A[0], A[1], z0], [B[0], B[1], z0], [B[0], B[1], z1], [A[0], A[1], z1]], soft: true });
+      if (r > 0) {
+        const a = ci[i], b = ci[i + 1];
+        f.push({ v: [[b[0], b[1], z0], [a[0], a[1], z0], [a[0], a[1], z1], [b[0], b[1], z1]], soft: true });
+        f.push({ v: [[A[0], A[1], z0], [a[0], a[1], z0], [b[0], b[1], z0], [B[0], B[1], z0]], soft: true });
+        f.push({ v: [[A[0], A[1], z1], [B[0], B[1], z1], [b[0], b[1], z1], [a[0], a[1], z1]], soft: true });
+      } else {
+        f.push({ v: [[0, 0, z0], [B[0], B[1], z0], [A[0], A[1], z0]], soft: true });
+        f.push({ v: [[0, 0, z1], [A[0], A[1], z1], [B[0], B[1], z1]], soft: true });
+      }
+    }
+    return f;
+  }
+
+  /* правильная призма вдоль Z — головка болта, гайка */
+  function prismFaces(R, sides, z0, z1) {
+    const f = [], p = [];
+    for (let i = 0; i < sides; i++) {
+      const a = (i / sides) * TAU + Math.PI / sides;
+      p.push([R * Math.cos(a), R * Math.sin(a)]);
+    }
+    for (let i = 0; i < sides; i++) {
+      const A = p[i], B = p[(i + 1) % sides];
+      f.push({ v: [[A[0], A[1], z0], [B[0], B[1], z0], [B[0], B[1], z1], [A[0], A[1], z1]], soft: false });
+    }
+    f.push({ v: p.map(function (q) { return [q[0], q[1], z1]; }), soft: false });
+    f.push({ v: p.slice().reverse().map(function (q) { return [q[0], q[1], z0]; }), soft: false });
+    return f;
+  }
+
+  /* шар запорного элемента */
+  function ballFaces(R, NU, NV) {
+    const f = [];
+    for (let i = 0; i < NV; i++) {
+      const t0 = (i / NV) * Math.PI, t1 = ((i + 1) / NV) * Math.PI;
+      for (let j = 0; j < NU; j++) {
+        const a0 = (j / NU) * TAU, a1 = ((j + 1) / NU) * TAU;
+        const P = function (t, a) {
+          return [R * Math.sin(t) * Math.cos(a), R * Math.cos(t), R * Math.sin(t) * Math.sin(a)];
+        };
+        f.push({ v: [P(t0, a0), P(t0, a1), P(t1, a1), P(t1, a0)], soft: true });
+      }
+    }
+    return f;
+  }
+
+  /* дуга трубы в плоскости XY — отвод */
+  function arcTubeFaces(bendR, R, r, a0, a1, NA, NC) {
+    const f = [];
+    const pt = function (a, phi, rad) {
+      const u = [Math.cos(a), Math.sin(a), 0];
+      return [
+        bendR * u[0] + rad * Math.cos(phi) * u[0],
+        bendR * u[1] + rad * Math.cos(phi) * u[1],
+        rad * Math.sin(phi)
+      ];
+    };
+    for (let i = 0; i < NA; i++) {
+      const A = a0 + (a1 - a0) * (i / NA), B = a0 + (a1 - a0) * ((i + 1) / NA);
+      for (let j = 0; j < NC; j++) {
+        const p0 = (j / NC) * TAU, p1 = ((j + 1) / NC) * TAU;
+        f.push({ v: [pt(A, p0, R), pt(B, p0, R), pt(B, p1, R), pt(A, p1, R)], soft: true });
+        f.push({ v: [pt(A, p1, r), pt(B, p1, r), pt(B, p0, r), pt(A, p0, r)], soft: true });
+      }
+    }
+    for (let j = 0; j < NC; j++) {
+      const p0 = (j / NC) * TAU, p1 = ((j + 1) / NC) * TAU;
+      f.push({ v: [pt(a0, p0, R), pt(a0, p1, R), pt(a0, p1, r), pt(a0, p0, r)], soft: true });
+      f.push({ v: [pt(a1, p0, r), pt(a1, p1, r), pt(a1, p1, R), pt(a1, p0, R)], soft: true });
+    }
+    return f;
+  }
+
+  /* ---- преобразования готовых наборов граней ---- */
+
+  function mapPts(faces, fn) {
+    return faces.map(function (f) { return { v: f.v.map(fn), soft: f.soft }; });
+  }
+  function moveF(faces, dx, dy, dz) {
+    return mapPts(faces, function (p) { return [p[0] + dx, p[1] + dy, p[2] + dz]; });
+  }
+  /* поворот заготовки, построенной вдоль Z, на другую ось */
+  function alongX(faces) { return mapPts(faces, function (p) { return [p[2], p[1], -p[0]]; }); }
+  function alongY(faces) { return mapPts(faces, function (p) { return [p[0], p[2], -p[1]]; }); }
+
+  /* деталь сборки: откуда прилетает, когда и с каким доворотом */
+  function part(faces, from, t0, t1, rot, pivot, axis) {
+    return {
+      faces: faces, from: from || [0, 0, 0], t0: t0, t1: t1,
+      rot: rot || 0, pivot: pivot || [0, 0, 0], axis: axis || "z"
+    };
+  }
+
+  function buildShape(kind) {
+    if (kind === "elbow") {
+      const B = 152, R = 46, r = 31, NC = 14;
+      const seg = [];
+      for (let i = 0; i < 4; i++) {
+        const a0 = (Math.PI / 2) * (i / 4), a1 = (Math.PI / 2) * ((i + 1) / 4);
+        seg.push(part(arcTubeFaces(B, R, r, a0, a1, 4, NC),
+          [0, 0, 210], 0.02 + i * 0.12, 0.26 + i * 0.12));
+      }
+      return seg.concat([
+        part(moveF(alongY(tubeFaces(R, r, 0, 62, NC)), B, -62, 0), [0, -250, 0], 0.50, 0.72),
+        part(moveF(alongX(tubeFaces(R, r, 0, 62, NC)), -62, B, 0), [-250, 0, 0], 0.56, 0.78),
+        part(moveF(alongY(tubeFaces(84, r, 0, 24, 20)), B, -86, 0), [0, -300, 0], 0.70, 0.90),
+        part(moveF(alongX(tubeFaces(84, r, 0, 24, 20)), -86, B, 0), [-300, 0, 0], 0.78, 1.00)
+      ]);
+    }
+
+    if (kind === "flange") {
+      const list = [
+        part(tubeFaces(126, 46, -18, 18, 22), [0, 0, 300], 0.00, 0.26),
+        part(tubeFaces(76, 46, 18, 56, 20), [0, 0, 240], 0.18, 0.42),
+        part(tubeFaces(60, 46, 56, 92, 20), [0, 0, 220], 0.28, 0.52)
+      ];
+      const NB = 8;
+      for (let i = 0; i < NB; i++) {
+        const a = (i / NB) * TAU + Math.PI / NB;
+        const x = 96 * Math.cos(a), y = 96 * Math.sin(a);
+        const bolt = moveF(tubeFaces(11, 0, -40, 34, 10), x, y, 0)
+          .concat(moveF(prismFaces(19, 6, 34, 54), x, y, 0));
+        list.push(part(bolt, [0, 0, 200], 0.44 + i * 0.05, 0.64 + i * 0.05, -2.4, [x, y, 0]));
+      }
+      return list;
+    }
+
+    if (kind === "bolt") {
+      return [
+        part(alongX(tubeFaces(27, 0, -160, 116, 18)), [-300, 0, 0], 0.00, 0.26),
+        part(alongX(prismFaces(54, 6, 116, 176)), [300, 0, 0], 0.18, 0.44),
+        part(alongX(tubeFaces(64, 29, -106, -86, 20)), [-300, 0, 0], 0.40, 0.64),
+        part(alongX(prismFaces(52, 6, -86, -34)), [-330, 0, 0], 0.60, 1.00, -6.3, [0, 0, 0], "x")
+      ];
+    }
+
+    if (kind === "beam") {
+      const L = 150;
+      return [
+        part(boxFaces(-6, -86, -L, 6, 86, L), [0, 0, 240], 0.00, 0.30),
+        part(boxFaces(-56, 86, -L, 56, 100, L), [0, 230, 0], 0.22, 0.56),
+        part(boxFaces(-56, -100, -L, 56, -86, L), [0, -230, 0], 0.40, 0.76)
+      ];
+    }
+
+    /* кран шаровой фланцевый — по умолчанию */
+    const NP = 20;
+    return [
+      part(ballFaces(60, 12, 8), [0, 250, 0], 0.00, 0.22),
+      part(alongX(tubeFaces(78, 0, -92, 92, 22)), [0, 0, 260], 0.14, 0.40),
+      part(alongX(tubeFaces(48, 31, -156, -92, NP)), [-280, 0, 0], 0.30, 0.54),
+      part(alongX(tubeFaces(48, 31, 92, 156, NP)), [280, 0, 0], 0.30, 0.54),
+      part(alongX(tubeFaces(92, 31, -176, -156, NP)), [-330, 0, 0], 0.46, 0.70),
+      part(alongX(tubeFaces(92, 31, 156, 176, NP)), [330, 0, 0], 0.46, 0.70),
+      part(alongY(tubeFaces(17, 0, 66, 140, 14)), [0, 280, 0], 0.60, 0.80),
+      part(
+        boxFaces(-14, 140, -15, 150, 162, 15).concat(moveF(alongX(tubeFaces(19, 0, -10, 10, 12)), 150, 151, 0)),
+        [0, 120, 0], 0.74, 1.00, -1.15, [0, 140, 0]
+      )
+    ];
   }
 
   function initHeroViewer() {
@@ -486,6 +636,7 @@
       return [v[0] / m, v[1] / m, v[2] / m];
     })();
     const DARK = [0, 88, 132], BASE = [0, 145, 208], LITE = [122, 210, 246];
+    const HOT = [231, 128, 52];
     const mixc = function (c1, c2, t) {
       return [
         Math.round(c1[0] + (c2[0] - c1[0]) * t),
@@ -493,36 +644,51 @@
         Math.round(c1[2] + (c2[2] - c1[2]) * t)
       ];
     };
-    const tone = function (t) {
-      const c = t < 0.5 ? mixc(DARK, BASE, t * 2) : mixc(BASE, LITE, (t - 0.5) * 2);
-      return "rgb(" + c[0] + "," + c[1] + "," + c[2] + ")";
+    const rgb = function (c) { return "rgb(" + c[0] + "," + c[1] + "," + c[2] + ")"; };
+    const tone = function (t, hot) {
+      let c = t < 0.5 ? mixc(DARK, BASE, t * 2) : mixc(BASE, LITE, (t - 0.5) * 2);
+      if (hot > 0) c = mixc(c, HOT, hot * 0.92);
+      return rgb(c);
     };
 
-    let faces = buildShape(heroShape);
+    const ASM_MS = 2800;
+    let parts = buildShape(heroShape);
+    let asmFrom = 0, asm = reduce ? 1 : 0;
     let modelR = 1;
+
     function measure() {
       modelR = 1;
-      faces.forEach(function (f) {
-        f.v.forEach(function (p) {
-          const d = Math.sqrt(p[0] * p[0] + p[1] * p[1] + p[2] * p[2]);
-          if (d > modelR) modelR = d;
+      parts.forEach(function (pt) {
+        pt.faces.forEach(function (f) {
+          f.v.forEach(function (p) {
+            const d = Math.sqrt(p[0] * p[0] + p[1] * p[1] + p[2] * p[2]);
+            if (d > modelR) modelR = d;
+          });
         });
       });
     }
     measure();
 
-    /* у каждого профиля свой стартовый ракурс — так форма читается лучше всего */
+    /* у каждого изделия свой стартовый ракурс — так форма читается лучше всего */
     const START = {
-      beam:  [-0.34, 0.62],
-      pipe:  [-0.30, 0.70],
-      angle: [0.30, -0.72],
-      sheet: [-0.46, 0.58]
+      valve:  [-0.30, 0.58],
+      elbow:  [-0.30, 0.40],
+      flange: [-0.40, 0.66],
+      bolt:   [-0.34, 0.52],
+      beam:   [-0.34, 0.62]
     };
-    const startAngles = function () { return START[heroShape] || START.beam; };
+    const startAngles = function () { return START[heroShape] || START.valve; };
     let rotX = startAngles()[0], rotY = startAngles()[1];
     let auto = !reduce, dragging = false, touched = false;
     let lastX = 0, lastY = 0, raf = 0, w = 0, h = 0, dpr = 1;
     let visible = true, alive = true, needs = true;
+
+    function restart() {
+      asm = reduce ? 1 : 0;
+      asmFrom = (window.performance && performance.now) ? performance.now() : Date.now();
+      needs = true;
+    }
+    restart();
 
     function resize() {
       const rect = canvas.getBoundingClientRect();
@@ -534,6 +700,8 @@
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       needs = true;
     }
+
+    const easeOut = function (t) { return 1 - Math.pow(1 - t, 3); };
 
     function draw() {
       ctx.clearRect(0, 0, w, h);
@@ -554,26 +722,54 @@
       ctx.fill();
 
       const list = [];
-      for (let i = 0; i < faces.length; i++) {
-        const f = faces[i], src = f.v, pts = [];
-        let zs = 0;
-        for (let j = 0; j < src.length; j++) {
-          const p = src[j];
-          const x1 = p[0] * cy + p[2] * sy;
-          const z1 = -p[0] * sy + p[2] * cy;
-          const y2 = p[1] * cx - z1 * sx;
-          const z2 = p[1] * sx + z1 * cx;
-          pts.push([x1, y2, z2]);
-          zs += z2;
+      for (let n = 0; n < parts.length; n++) {
+        const pt = parts[n];
+        const raw = pt.t1 > pt.t0 ? (asm - pt.t0) / (pt.t1 - pt.t0) : 1;
+        const p = Math.max(0, Math.min(1, raw));
+        if (p <= 0) continue;
+        const e = easeOut(p);
+        const k = 1 - e;                       /* 1 — деталь ещё в полёте, 0 — на месте */
+        const alpha = Math.min(1, p * 4);
+        const hot = Math.pow(1 - p, 1.5);      /* свежий срез остывает */
+        const ca = Math.cos(pt.rot * k), sa = Math.sin(pt.rot * k);
+        const ax = pt.axis;
+
+        for (let i = 0; i < pt.faces.length; i++) {
+          const src = pt.faces[i].v, pts = [];
+          let zs = 0;
+          for (let j = 0; j < src.length; j++) {
+            let X = src[j][0], Y = src[j][1], Z = src[j][2];
+            if (pt.rot) {
+              if (ax === "x") {
+                const dy = Y - pt.pivot[1], dz = Z - pt.pivot[2];
+                Y = pt.pivot[1] + dy * ca - dz * sa;
+                Z = pt.pivot[2] + dy * sa + dz * ca;
+              } else if (ax === "y") {
+                const dz = Z - pt.pivot[2], dx2 = X - pt.pivot[0];
+                Z = pt.pivot[2] + dz * ca - dx2 * sa;
+                X = pt.pivot[0] + dz * sa + dx2 * ca;
+              } else {
+                const dx = X - pt.pivot[0], dy = Y - pt.pivot[1];
+                X = pt.pivot[0] + dx * ca - dy * sa;
+                Y = pt.pivot[1] + dx * sa + dy * ca;
+              }
+            }
+            X += pt.from[0] * k; Y += pt.from[1] * k; Z += pt.from[2] * k;
+            const x1 = X * cy + Z * sy;
+            const z1 = -X * sy + Z * cy;
+            const y2 = Y * cx - z1 * sx;
+            const z2 = Y * sx + z1 * cx;
+            pts.push([x1, y2, z2]);
+            zs += z2;
+          }
+          list.push({ pts: pts, z: zs / src.length, soft: pt.faces[i].soft, a: alpha, hot: hot });
         }
-        list.push({ pts: pts, z: zs / src.length, soft: f.soft });
       }
       list.sort(function (p, q) { return p.z - q.z; });
 
       ctx.lineJoin = "round";
-      ctx.lineWidth = 1;
       for (let i = 0; i < list.length; i++) {
-        const pts = list[i].pts;
+        const it = list[i], pts = it.pts;
         const ax = pts[1][0] - pts[0][0], ay = pts[1][1] - pts[0][1], az = pts[1][2] - pts[0][2];
         const bx = pts[2][0] - pts[0][0], by = pts[2][1] - pts[0][1], bz = pts[2][2] - pts[0][2];
         let nx = ay * bz - az * by, ny = az * bx - ax * bz, nz = ax * by - ay * bx;
@@ -582,6 +778,7 @@
         if (nz < 0) { nx = -nx; ny = -ny; nz = -nz; }
         const dot = Math.max(0, nx * LIGHT[0] + ny * LIGHT[1] + nz * LIGHT[2]);
 
+        ctx.globalAlpha = it.a;
         ctx.beginPath();
         for (let j = 0; j < pts.length; j++) {
           const p = pts[j];
@@ -591,19 +788,29 @@
           if (j === 0) ctx.moveTo(X, Y); else ctx.lineTo(X, Y);
         }
         ctx.closePath();
-        const fill = tone(0.14 + 0.86 * dot);
+        const fill = tone(0.14 + 0.86 * dot, it.hot);
         ctx.fillStyle = fill;
         ctx.fill();
         /* на круглых поверхностях обводим цветом заливки — иначе видны швы сегментов */
-        ctx.strokeStyle = list[i].soft ? fill : "rgba(11,16,20,.20)";
+        ctx.lineWidth = it.hot > 0.04 ? 1.6 : 1;
+        ctx.strokeStyle = it.hot > 0.04
+          ? rgb(mixc([11, 16, 20], HOT, Math.min(1, it.hot + 0.35)))
+          : (it.soft ? fill : "rgba(11,16,20,.20)");
         ctx.stroke();
       }
+      ctx.globalAlpha = 1;
     }
 
     function loop() {
       if (!alive) return;
-      if (auto && visible && !document.hidden) { rotY += 0.0042; needs = true; }
-      if (needs && visible && !document.hidden) { draw(); needs = false; }
+      const on = visible && !document.hidden;
+      if (on && asm < 1) {
+        const now = (window.performance && performance.now) ? performance.now() : Date.now();
+        asm = Math.min(1, (now - asmFrom) / ASM_MS);
+        needs = true;
+      }
+      if (auto && on) { rotY += 0.0042; needs = true; }
+      if (needs && on) { draw(); needs = false; }
       raf = requestAnimationFrame(loop);
     }
 
@@ -648,6 +855,7 @@
       else if (e.key === "ArrowRight") rotY += step;
       else if (e.key === "ArrowUp") rotX = Math.max(-1.25, rotX - step);
       else if (e.key === "ArrowDown") rotX = Math.min(1.25, rotX + step);
+      else if (e.key === "Enter" || e.key === " ") { restart(); e.preventDefault(); return; }
       else return;
       e.preventDefault();
       stopAuto();
@@ -674,12 +882,12 @@
 
     $$("[data-shape]").forEach(function (b) {
       b.addEventListener("click", function () {
+        /* повторное нажатие на активную вкладку пересобирает изделие заново */
         heroShape = b.dataset.shape;
-        faces = buildShape(heroShape);
+        parts = buildShape(heroShape);
         measure();
-        /* каждый профиль показываем с выгодного ракурса */
         rotX = startAngles()[0]; rotY = startAngles()[1];
-        needs = true;
+        restart();
         $$("[data-shape]").forEach(function (x) {
           x.setAttribute("aria-pressed", x.dataset.shape === heroShape ? "true" : "false");
         });
@@ -926,15 +1134,18 @@
         '<div class="container hero__grid">' +
           "<div>" +
             '<p class="eyebrow eyebrow--brand">' + esc(CO.city) + " · " + esc(CO.tagline) + "</p>" +
-            '<h1 class="hero__title" id="pageTitle" tabindex="-1">Металлопрокат со склада.<br>Наличие и цена — <em>сразу на экране</em>.</h1>' +
-            '<p class="hero__lead lead">Остаток по выбранному складу, цена за тонну по объёму и пересчёт массы в метры, штуки и листы. ' +
-              "Счёт для юрлица формируется из корзины — без переписки и ожидания прайса.</p>" +
+            '<h1 class="hero__title" id="pageTitle" tabindex="-1">Изготавливаем трубопроводную арматуру.<br>' +
+              "Поставляем <em>металлопрокат</em> со склада.</h1>" +
+            '<p class="hero__lead lead">Краны шаровые, отводы, фланцы, опоры и заглушки поворотные — ' +
+              "делаем с любой строительной длиной и комплектуем редуктором, электро- или пневмоприводом. " +
+              "Прокат отгружаем со склада: наличие и цена видны сразу, счёт для юрлица формируется из корзины.</p>" +
             '<div class="hero__cta">' +
               '<a class="btn btn--lg" href="#/smeta">Подобрать по смете</a>' +
               '<a class="btn btn--lg btn--secondary" href="#/catalog">Открыть каталог</a>' +
             "</div>" +
             '<div class="hero__meta">' +
-              '<span class="chip chip--brand">Счёт и УПД</span>' +
+              '<span class="chip chip--brand">Изготовление под размер</span>' +
+              '<span class="chip">Счёт и УПД</span>' +
               '<span class="chip">Резерв 30 минут</span>' +
               '<span class="chip">Резка в размер</span>' +
               '<span class="chip">Самовывоз и доставка</span>' +
@@ -954,7 +1165,7 @@
         '<div class="container">' +
           '<div class="section-head reveal">' +
             '<p class="eyebrow">Что возим</p>' +
-            "<h2>Металлопрокат со склада и трубопроводная арматура</h2>" +
+            "<h2>Что изготавливаем и что возим со склада</h2>" +
             '<p class="lead">Внутри группы — фильтры по типу, марке и ГОСТу. У проката видно наличие на трёх складах сразу. ' +
               "Арматуру, фланцы и опоры подбираем под задачу — по ним цена и срок по запросу.</p>" +
           "</div>" +
@@ -2285,8 +2496,8 @@
   };
 
   const TITLES = {
-    home: "СоюзНефтеГаз — металлопрокат со склада в Челябинске",
-    catalog: "Каталог металлопроката", product: "Позиция каталога",
+    home: "СоюзНефтеГаз — трубопроводная арматура и металлопрокат, Челябинск",
+    catalog: "Каталог продукции", product: "Позиция каталога",
     smeta: "Подбор по смете", calc: "Калькулятор массы металла",
     cart: "Корзина", checkout: "Оформление заказа", account: "Личный кабинет",
     about: "О компании и реквизиты", delivery: "Доставка и оплата",

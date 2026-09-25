@@ -398,11 +398,19 @@ a.card__title:hover { color: var(--action); }
 .hero { position: relative; overflow: hidden; background: var(--surface); border-bottom: 1px solid var(--line-2); }
 .hero__grid {
   display: grid; gap: var(--s-6);
+  /* minmax(0, …) обязателен: без него колонка растягивается под самое широкое
+     содержимое и первый экран вылезает за край на узких телефонах */
+  grid-template-columns: minmax(0, 1fr);
   padding-block: clamp(36px, 6vw, 80px) clamp(32px, 5vw, 64px); align-items: center;
 }
-@media (min-width: 980px) { .hero__grid { grid-template-columns: 1.15fr .85fr; gap: var(--s-7); } }
+@media (min-width: 980px) {
+  .hero__grid { grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr); gap: var(--s-7); }
+}
 
-.hero__title { font-size: var(--fs-display); line-height: 1.03; letter-spacing: -0.035em; margin-block: var(--s-4); }
+.hero__title {
+  font-size: var(--fs-display); line-height: 1.03; letter-spacing: -0.035em; margin-block: var(--s-4);
+  overflow-wrap: break-word; -webkit-hyphens: auto; hyphens: auto;
+}
 .hero__title em { font-style: normal; color: var(--action); position: relative; white-space: nowrap; }
 .hero__title em::after {
   content: ""; position: absolute; left: 0; right: 0; bottom: .05em; height: .08em;
@@ -462,8 +470,10 @@ a.card__title:hover { color: var(--action); }
   position: relative; z-index: 1; display: flex; width: 100%;
   justify-content: center; margin-top: var(--s-4);
 }
-@media (max-width: 380px) {
-  .viewer__tabs button { padding: 7px 10px; font-size: var(--fs-xs); }
+/* пять изделий должны помещаться в один ряд, на телефоне — в два */
+.segmented.viewer__tabs button { padding: 8px 11px; font-size: var(--fs-xs); }
+@media (max-width: 440px) {
+  .segmented.viewer__tabs button { padding: 7px 7px; font-size: 11px; letter-spacing: -0.01em; }
 }
 
 .trust { display: grid; gap: 1px; background: var(--line-2); border-block: 1px solid var(--line-2); grid-template-columns: 1fr 1fr; }
