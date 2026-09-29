@@ -223,13 +223,42 @@ a:hover { color: var(--action-700); }
 
 .header-actions { display: flex; align-items: center; gap: var(--s-2); flex: 0 0 auto; }
 
+/* Телефон в правом верхнем углу виден на любом экране.
+   На компьютере — номер и город в две строки. На телефоне — номер одной
+   строкой: замеры показали, что от 360 px он укладывается рядом с логотипом,
+   корзиной и бургером с запасом. Уже 360 px остаётся трубка кнопкой звонка. */
 .header-phone {
-  display: none; text-decoration: none; color: var(--ink);
+  display: flex; align-items: center; gap: 7px; text-decoration: none; color: var(--ink);
   font-weight: 800; font-size: var(--fs-sm); white-space: nowrap; line-height: 1.2;
+  min-height: 44px;
 }
 .header-phone:hover { color: var(--action); }
-.header-phone span { display: block; font-weight: 400; color: var(--muted); font-size: var(--fs-xs); }
-@media (min-width: 760px) { .header-phone { display: block; } }
+.header-phone__ico { display: grid; place-items: center; color: var(--action); }
+.header-phone__ico svg { width: 20px; height: 20px; }
+.header-phone__num { font-size: 12.5px; }
+.header-phone__city { display: none; font-weight: 400; color: var(--muted); font-size: var(--fs-xs); }
+
+@media (min-width: 360px) and (max-width: 759px) {
+  .header-phone__ico { display: none; }
+}
+@media (max-width: 359px) {
+  .header-phone__num { display: none; }
+  .header-phone {
+    width: 44px; justify-content: center;
+    background: var(--surface-2); border-radius: var(--r-2);
+  }
+}
+/* на телефоне выгадываем место под номер: логотип и отступы чуть плотнее */
+@media (max-width: 639px) {
+  .brand__logo { height: 26px; }
+  .header-bar { gap: 8px; }
+  .header-actions { gap: 6px; }
+}
+@media (min-width: 760px) {
+  .header-phone__ico { display: none; }
+  .header-phone__num { display: block; font-size: var(--fs-sm); }
+  .header-phone__city { display: block; }
+}
 
 .icon-btn {
   display: inline-grid; place-items: center; position: relative;
@@ -587,6 +616,27 @@ a.card__title:hover { color: var(--action); }
   /* без этого широкая таблица растягивает всю страницу вбок */
   contain: paint;
 }
+
+/* На телефоне широкая таблица либо уезжает вбок, либо сжимает первую колонку
+   так, что слова рвутся по буквам. Поэтому строка становится карточкой:
+   название сверху, дальше «подпись — значение», внизу кнопка. */
+@media (max-width: 639px) {
+  .table--stack, .table--stack tbody, .table--stack tr, .table--stack td { display: block; width: auto; }
+  .table--stack thead { display: none; }
+  .table--stack tr { padding: 14px; border-top: 1px solid var(--line-2); }
+  .table--stack tbody tr:first-child { border-top: 0; }
+  .table--stack td { border: 0; padding: 3px 0; text-align: left; }
+  .table--stack td[data-l] {
+    display: flex; gap: 12px; align-items: baseline; justify-content: space-between;
+  }
+  .table--stack td[data-l]::before {
+    content: attr(data-l); flex: 0 0 auto;
+    font-family: var(--sans); font-weight: 400; font-size: var(--fs-xs); color: var(--muted);
+  }
+  .table--stack td.num { font-family: var(--mono); }
+  .table--stack td:last-child { padding-top: 10px; }
+  .table--stack td:last-child .btn { width: 100%; }
+}
 .table { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); }
 .table th, .table td { padding: 12px 14px; text-align: left; vertical-align: top; }
 .table thead th {
@@ -645,6 +695,22 @@ a.table__name:hover { color: var(--action); }
 .matrix .no   { background: var(--surface-2); color: var(--muted); }
 .matrix .cond { background: var(--warn-bg); color: var(--warn); font-weight: 700; }
 
+/* на телефоне четыре роли в ряд не помещаются — каждое действие становится карточкой */
+@media (max-width: 639px) {
+  .matrix, .matrix tbody, .matrix tr, .matrix td, .matrix tbody th { display: block; width: auto; }
+  .matrix thead { display: none; }
+  .matrix tr { border: 1px solid var(--line-2); border-radius: var(--r-2); padding: 10px 12px; margin-bottom: 8px; }
+  .matrix tbody th:first-child { border: 0; padding: 0 0 8px; min-width: 0; font-size: var(--fs-sm); }
+  .matrix td {
+    border: 0; background: none; padding: 4px 0; text-align: right;
+    display: flex; gap: 12px; align-items: baseline; justify-content: space-between;
+  }
+  .matrix td::before {
+    content: attr(data-l); flex: 0 0 auto;
+    font-weight: 400; color: var(--muted); font-size: var(--fs-xs);
+  }
+}
+
 /* ---------- 12. Каталог ---------- */
 .catalog-layout { display: grid; gap: var(--s-5); align-items: start; }
 @media (min-width: 1000px) { .catalog-layout { grid-template-columns: 262px 1fr; } }
@@ -683,12 +749,41 @@ a.table__name:hover { color: var(--action); }
   .result-cards .card__foot { padding-top: var(--s-2); }
   .result-cards .price { font-size: 1rem; }
 }
+/* То же на главной: в один столбец квадрат с рисунком занимал пол-экрана,
+   и до конца блока приходилось листать долго. */
+@media (max-width: 599px) {
+  .grid--auto { gap: var(--s-2); }
+  .grid--auto .card { flex-direction: row; align-items: stretch; }
+  .grid--auto .card__media {
+    flex: 0 0 104px; width: 104px; aspect-ratio: auto; padding: 10px;
+    border-bottom: 0; border-right: 1px solid var(--line-2);
+  }
+  .grid--auto .card__media svg { width: 100%; height: auto; }
+  .grid--auto .card__media img { max-width: 100%; max-height: 84px; }
+  .grid--auto .card__body { padding: var(--s-3); gap: 4px; }
+  .grid--auto .card__foot { padding-top: var(--s-2); }
+  .grid--auto .price { font-size: 1rem; }
+}
 .result-table { display: none; }
 @media (min-width: 900px) { .result-table { display: block; } }
 
 /* ---------- 13. Карточка товара ---------- */
 .pdp { display: grid; gap: var(--s-5); align-items: start; }
+.pdp__specs { margin-top: var(--s-4); }
 @media (min-width: 980px) { .pdp { grid-template-columns: 1fr 1fr; gap: var(--s-7); } }
+
+/* На телефоне колонок нет, и в исходном порядке название с ценой оказывались
+   под всей таблицей характеристик — экранов пять прокрутки до кнопки.
+   Распускаем обёртки колонок и раскладываем блоки:
+   название, фото, цена с кнопкой, характеристики. */
+@media (max-width: 979px) {
+  .pdp { gap: var(--s-4); }
+  .pdp__media, .pdp__side { display: contents; }
+  .pdp__side > * { order: 3; margin-top: 0; }
+  .pdp__head   { order: 1; }
+  .pdp__figure { order: 2; }
+  .pdp__specs  { order: 4; margin-top: 0; }
+}
 
 .pdp__figure {
   border: 1px solid var(--line); border-radius: var(--r-3);

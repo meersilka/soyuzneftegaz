@@ -55,8 +55,9 @@
     since: 2015,
     addrLegal: "454030, Челябинская область, г. Челябинск, ул. Скульптора Головницкого, д. 32, кв. 215",
     addrFact:  "454030, Челябинская область, г. Челябинск, ул. Скульптора Головницкого, д. 32, кв. 215",
-    /* Телефон, ФИО и карточка PDF скрыты на время демонстрации.
-       Настоящие значения — в ЧИТАТЬ.md, раздел «Что скрыто перед публикацией». */
+    /* ФИО и карточка партнёра скрыты на время демонстрации.
+       Настоящие значения — в ЧИТАТЬ.md, раздел «Что скрыто перед публикацией».
+       Телефон открыт по прямой просьбе владельца (29.09.2026). */
     ceo: "ХХХХХХХ Х. Х.",
     founder: "ХХХХХХХ Х. Х.",
     capital: "10 000 рублей",
@@ -65,8 +66,8 @@
     rs: "40702810120000284420",
     bik: "044525104",
     ks: "30101810745374525104",
-    phone: "8 ХХХ ХХХ-ХХ-ХХ",
-    phoneHref: "",
+    phone: "+7 (915) 038-41-65",
+    phoneHref: "+79150384165",
     vat: "Компания работает с НДС",
     city: "Челябинск",
     pdf: ""
@@ -976,7 +977,7 @@
     return (
       '<div class="notice-bar"><div class="container">' +
         "<span>Демонстрационная версия. Каталог, остатки, цены и список складов — учебный набор данных. " +
-        "Телефон и имена скрыты. Реквизиты компании и город — настоящие.</span>" +
+        "Имена сотрудников скрыты. Телефон, реквизиты компании и город — настоящие.</span>" +
       "</div></div>" +
       '<header class="site-header">' +
         '<div class="container header-bar">' +
@@ -991,8 +992,12 @@
             }).join("") +
           "</nav>" +
           '<div class="header-actions">' +
-            '<a class="header-phone" href="' + attr(TEL) + '">' + esc(CO.phone) +
-              "<span>" + esc(CO.city) + "</span></a>" +
+            '<a class="header-phone" href="' + attr(TEL) + '" aria-label="Позвонить: ' + attr(CO.phone) + '">' +
+              '<span class="header-phone__ico" aria-hidden="true">' + icon("phone") + "</span>" +
+              '<span class="header-phone__box">' +
+                '<span class="header-phone__num">' + esc(CO.phone) + "</span>" +
+                '<span class="header-phone__city">' + esc(CO.city) + "</span>" +
+              "</span></a>" +
             '<a class="icon-btn" href="#/cart">' + icon("cart") +
               '<span class="visually-hidden">Корзина, позиций:</span>' +
               '<span class="icon-btn__count" data-cart-count aria-live="polite">' + state.cart.length + "</span></a>" +
@@ -1552,12 +1557,12 @@
           { label: s.l2 }
         ]) +
         '<div class="pdp">' +
-          "<div>" +
+          '<div class="pdp__media">' +
             '<figure class="pdp__figure' + (s.photo ? " pdp__figure--photo" : "") + '" style="margin:0">' +
               mediaHtml(s) +
               (s.photo ? '<figcaption class="pdp__cap">Фото из каталога продукции 2015 года</figcaption>' : "") +
             "</figure>" +
-            '<div class="panel" style="margin-top:16px">' +
+            '<div class="panel pdp__specs">' +
               "<h2 style=\"font-size:1.0625rem\">Характеристики</h2>" +
               '<table class="table table--plain" style="margin-top:12px"><tbody>' +
                 "<tr><th>Артикул</th><td class=\"num\">" + esc(s.id) + "</td></tr>" +
@@ -1579,10 +1584,11 @@
             "</div>" +
           "</div>" +
 
-          "<div>" +
-            '<p class="eyebrow">' + esc(s.l2) + " · " + esc(s.mer) + "</p>" +
-            '<h1 id="pageTitle" tabindex="-1" style="margin-top:10px">' + esc(s.name) + "</h1>" +
-
+          '<div class="pdp__side">' +
+            '<div class="pdp__head">' +
+              '<p class="eyebrow">' + esc(s.l2) + " · " + esc(s.mer) + "</p>" +
+              '<h1 id="pageTitle" tabindex="-1" style="margin-top:10px">' + esc(s.name) + "</h1>" +
+            "</div>" +
             '<div class="panel" style="margin-top:20px">' +
               '<p class="price price--lg">' + (p ? fmt(p) + " <small>₽ за тонну</small>" : "цена по запросу") + "</p>" +
               '<p class="small muted" style="margin-top:6px">' +
@@ -1711,7 +1717,7 @@
             "</div>"
           : '<div class="panel panel--flush">' +
               '<div class="table-scroll" style="border:0">' +
-                '<table class="table">' +
+                '<table class="table table--stack">' +
                   "<thead><tr>" +
                     '<th scope="col">Строка сметы</th>' +
                     '<th scope="col">Позиция склада</th>' +
@@ -1722,9 +1728,9 @@
                     const lv = LVL[r.lvl];
                     return (
                       "<tr>" +
-                        "<td>" + esc(r.src) + "</td>" +
-                        "<td>" + esc(r.dst) + "</td>" +
-                        '<td><span class="chip ' + lv.cls + '">' + esc(lv.label) + "</span></td>" +
+                        '<td data-l="Строка сметы">' + esc(r.src) + "</td>" +
+                        '<td data-l="Позиция склада">' + esc(r.dst) + "</td>" +
+                        '<td data-l="Результат"><span class="chip ' + lv.cls + '">' + esc(lv.label) + "</span></td>" +
                         "<td>" +
                           (r.lvl === "REJECT"
                             ? '<span class="xs muted">свяжемся сами</span>'
@@ -1912,7 +1918,7 @@
         "</div>" +
 
         '<div class="table-scroll">' +
-          '<table class="table">' +
+          '<table class="table table--stack">' +
             "<thead><tr>" +
               '<th scope="col">Позиция</th>' +
               '<th scope="col" class="num">Тонн</th>' +
@@ -1926,10 +1932,10 @@
                 "<tr>" +
                   '<td><a class="table__name" href="#/product/' + encodeURIComponent(r.s.id) + '">' + esc(r.s.name) + "</a>" +
                     '<div class="xs muted">' + esc(r.s.gost) + "</div></td>" +
-                  '<td class="num">' + fmt2(r.tons) + "</td>" +
-                  '<td class="num">' + fmt(priceNow(r.s)) + "</td>" +
-                  "<td>" + esc(isScrap(r.s) ? "агент, ст. 161" : "20%") + "</td>" +
-                  '<td class="num">' + fmt(priceNow(r.s) * r.tons) + "</td>" +
+                  '<td class="num" data-l="Тонн">' + fmt2(r.tons) + "</td>" +
+                  '<td class="num" data-l="₽ за тонну">' + fmt(priceNow(r.s)) + "</td>" +
+                  '<td data-l="НДС">' + esc(isScrap(r.s) ? "агент, ст. 161" : "20%") + "</td>" +
+                  '<td class="num" data-l="Сумма">' + fmt(priceNow(r.s) * r.tons) + "</td>" +
                   '<td><button class="btn btn--sm btn--ghost" data-del="' + attr(r.s.id) + '" ' +
                     'aria-label="Убрать ' + attr(r.s.name) + '">Убрать</button></td>' +
                 "</tr>"
@@ -2421,10 +2427,13 @@
     );
   }
 
-  function permCell(v) {
-    if (v === "Y") return '<td class="yes">да</td>';
-    if (v === "C") return '<td class="cond">по настройке</td>';
-    return '<td class="no">нет</td>';
+  /* data-l нужен, чтобы на телефоне у ячейки появилась подпись роли:
+     там матрица разворачивается в карточки и шапка таблицы не видна */
+  function permCell(v, role) {
+    const l = ' data-l="' + attr(role) + '"';
+    if (v === "Y") return '<td class="yes"' + l + ">да</td>";
+    if (v === "C") return '<td class="cond"' + l + ">по настройке</td>";
+    return '<td class="no"' + l + ">нет</td>";
   }
 
   function lkMatrix() {
@@ -2440,7 +2449,8 @@
             "</tr></thead><tbody>" +
             PERMS.map(function (p) {
               return "<tr><th scope=\"row\">" + esc(p[1]) + "</th>" +
-                permCell(p[2].supply) + permCell(p[2].boss) + permCell(p[2].acc) + permCell(p[2].foreman) + "</tr>";
+                permCell(p[2].supply, "Снабженец") + permCell(p[2].boss, "Руководитель") +
+                permCell(p[2].acc, "Бухгалтер") + permCell(p[2].foreman, "Прораб") + "</tr>";
             }).join("") +
             "</tbody></table>" +
         "</div>" +
