@@ -416,7 +416,7 @@
      в изделие, а свежий срез металла остывает с оранжевого до синего. */
 
   const SHAPES = [
-    ["valve",  "Кран",   "Кран шаровой фланцевый в сборе"],
+    ["valve",  "Кран шаровой", "Кран шаровой фланцевый в сборе"],
     ["elbow",  "Отвод",  "Отвод 90° с фланцами"],
     ["flange", "Фланец", "Фланец с крепёжными болтами"],
     ["bolt",   "Крепёж", "Болт с шайбой и гайкой"],
@@ -993,10 +993,8 @@
           '<div class="header-actions">' +
             '<a class="header-phone" href="' + attr(TEL) + '" aria-label="Позвонить: ' + attr(CO.phone) + '">' +
               '<span class="header-phone__ico" aria-hidden="true">' + icon("phone") + "</span>" +
-              '<span class="header-phone__box">' +
-                '<span class="header-phone__num">' + esc(CO.phone) + "</span>" +
-                '<span class="header-phone__city">' + esc(CO.city) + "</span>" +
-              "</span></a>" +
+              '<span class="header-phone__num">' + esc(CO.phone) + "</span>" +
+            "</a>" +
             '<a class="icon-btn" href="#/cart">' + icon("cart") +
               '<span class="visually-hidden">Корзина, позиций:</span>' +
               '<span class="icon-btn__count" data-cart-count aria-live="polite">' + state.cart.length + "</span></a>" +
@@ -1151,18 +1149,19 @@
       '<section class="hero">' +
         '<div class="container hero__grid">' +
           "<div>" +
-            '<p class="eyebrow eyebrow--brand">' + esc(CO.city) + " · " + esc(CO.tagline) + "</p>" +
+            '<p class="eyebrow eyebrow--brand">' + esc(CO.tagline) + "</p>" +
             '<h1 class="hero__title" id="pageTitle" tabindex="-1">Изготавливаем трубопроводную арматуру.<br>' +
               "Поставляем <em>металлопрокат</em> со склада.</h1>" +
-            '<p class="hero__lead lead">Краны шаровые, отводы, фланцы, опоры и заглушки поворотные — ' +
-              "делаем с любой строительной длиной и комплектуем редуктором, электро- или пневмоприводом. " +
-              "Прокат отгружаем со склада: наличие и цена видны сразу, счёт для юрлица формируется из корзины.</p>" +
+            '<p class="hero__lead lead"><b class="strong">Краны шаровые</b>, отводы, фланцы, опоры и заглушки ' +
+              "поворотные — делаем с любой строительной длиной и комплектуем редуктором, электро- " +
+              "или пневмоприводом. Металлопрокат отгружаем со склада: наличие и цена видны сразу, " +
+              "счёт для юрлица формируется из корзины.</p>" +
             '<div class="hero__cta">' +
               '<a class="btn btn--lg" href="#/smeta">Подобрать по смете</a>' +
               '<a class="btn btn--lg btn--secondary" href="#/catalog">Открыть каталог</a>' +
             "</div>" +
             '<div class="hero__meta">' +
-              '<span class="chip chip--brand">Изготовление под размер</span>' +
+              '<span class="chip chip--brand">Изготовление по чертежу заказчика</span>' +
               '<span class="chip">Счёт и УПД</span>' +
               '<span class="chip">Резерв 30 минут</span>' +
               '<span class="chip">Резка в размер</span>' +

@@ -223,10 +223,8 @@ a:hover { color: var(--action-700); }
 
 .header-actions { display: flex; align-items: center; gap: var(--s-2); flex: 0 0 auto; }
 
-/* Телефон в правом верхнем углу виден на любом экране.
-   На компьютере — номер и город в две строки. На телефоне — номер одной
-   строкой: замеры показали, что от 360 px он укладывается рядом с логотипом,
-   корзиной и бургером с запасом. Уже 360 px остаётся трубка кнопкой звонка. */
+/* Телефон в правом верхнем углу виден на любом экране: от 360 px номером,
+   уже 360 px — трубкой кнопкой звонка (замеры: номер туда не влезает). */
 .header-phone {
   display: flex; align-items: center; gap: 7px; text-decoration: none; color: var(--ink);
   font-weight: 800; font-size: var(--fs-sm); white-space: nowrap; line-height: 1.2;
@@ -236,7 +234,6 @@ a:hover { color: var(--action-700); }
 .header-phone__ico { display: grid; place-items: center; color: var(--action); }
 .header-phone__ico svg { width: 20px; height: 20px; }
 .header-phone__num { font-size: 12.5px; }
-.header-phone__city { display: none; font-weight: 400; color: var(--muted); font-size: var(--fs-xs); }
 
 @media (min-width: 360px) and (max-width: 759px) {
   .header-phone__ico { display: none; }
@@ -257,7 +254,6 @@ a:hover { color: var(--action-700); }
 @media (min-width: 760px) {
   .header-phone__ico { display: none; }
   .header-phone__num { display: block; font-size: var(--fs-sm); }
-  .header-phone__city { display: block; }
 }
 
 .icon-btn {
