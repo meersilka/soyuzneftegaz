@@ -93,11 +93,11 @@
     role: "boss",
     lkTab: "people",
     staff: store("sng_staff", null) || [
-      { id: "u1", fio: "ХХХХХХ Х. А.",    mail: "boss@example.ru",     role: "boss",    status: "active",  wh: ["MSK", "SPB", "EKB"], invoice: true,  pay: true },
-      { id: "u2", fio: "ХХХХХХ Х. В.",   mail: "komdir@example.ru", role: "supply",  status: "active",  wh: ["MSK", "SPB"],        invoice: true,  pay: false },
-      { id: "u3", fio: "ХХХХХХ Х. О.",    mail: "sales2@example.ru",  role: "foreman", status: "invited", wh: ["EKB"],               invoice: false, pay: false },
-      { id: "u4", fio: "ХХХХХХ Х. Н.",    mail: "buh@example.ru",      role: "acc",     status: "active",  wh: ["MSK", "SPB", "EKB"], invoice: false, pay: true },
-      { id: "u5", fio: "ХХХХХХ Х. Д.",    mail: "sales@example.ru",    role: "foreman", status: "active",  wh: ["MSK"],               invoice: false, pay: false }
+      { id: "u1", fio: "ХХХХХХ Х. А.",  mail: "boss@example.ru",    role: "boss",    status: "active",  wh: ["MSK", "SPB", "EKB"] },
+      { id: "u2", fio: "ХХХХХХ Х. В.",  mail: "komdir@example.ru",  role: "supply",  status: "active",  wh: ["MSK", "SPB"] },
+      { id: "u3", fio: "ХХХХХХ Х. О.",  mail: "sales2@example.ru",  role: "foreman", status: "invited", wh: ["EKB"] },
+      { id: "u4", fio: "ХХХХХХ Х. Н.",  mail: "buh@example.ru",     role: "acc",     status: "active",  wh: ["MSK", "SPB", "EKB"] },
+      { id: "u5", fio: "ХХХХХХ Х. Д.",  mail: "sales@example.ru",   role: "foreman", status: "active",  wh: ["MSK"] }
     ],
     audit: store("sng_audit", null) || [
       { t: "11.09.2026 16:40", who: "ХХХХХХ Х. А.", text: "Приглашён коммерческий директор · склады Москва, Санкт-Петербург" },
@@ -2382,7 +2382,7 @@
           '<p class="eyebrow">Кабинет компании</p>' +
           '<h1 id="pageTitle" tabindex="-1">Сотрудники и права</h1>' +
           '<p class="lead">Компания привязана к ИНН. Руководитель приглашает сотрудников и задаёт, ' +
-            "кто видит цены, кто выставляет счёт, а кто только забирает груз со склада.</p>" +
+            "кто видит цены и оформляет заказы, а кто только забирает груз со склада.</p>" +
         "</div>" +
 
         '<div class="panel panel--tight" style="margin-bottom:20px">' +
@@ -2430,9 +2430,6 @@
                 '<div class="xs muted">' + esc(ROLE_NAME[s.role]) + " · " + esc(s.mail || "почта не указана") + "</div>" +
                 '<div class="xs muted">склады: ' + esc(s.wh.map(function (w) { return WH[w] ? WH[w].short : w; }).join(", ")) + "</div></div>" +
               '<div><span class="chip ' + badge + '">' + esc(badgeText) + "</span></div>" +
-              '<div class="xs muted">' +
-                "счёт: " + (s.invoice ? "да" : "нет") + " · оплата: " + (s.pay ? "да" : "нет") +
-              "</div>" +
               "<div>" +
                 (canIam() && s.role !== "boss"
                   ? '<div style="display:grid;gap:8px;min-width:170px">' +
@@ -2521,7 +2518,6 @@
                 return '<label class="check check--card"><input type="checkbox" class="invWh" value="' + attr(w) + '"' +
                   (w !== "EKB" ? " checked" : "") + " /><span>" + esc(WH[w].name) + "</span></label>";
               }).join("") +
-              '<label class="check check--card"><input type="checkbox" name="invoice" /><span>Может выставлять счёт</span></label>' +
             "</div>" +
           "</fieldset>" +
           '<div class="row" style="margin-top:20px"><button class="btn btn--lg" type="submit">Отправить приглашение</button></div>' +
@@ -2928,9 +2924,7 @@
         mail: String(data.get("mail")).trim(),
         role: data.get("role"),
         status: "invited",
-        wh: wh.length ? wh : ["MSK"],
-        invoice: data.get("invoice") === "on",
-        pay: data.get("role") === "acc"
+        wh: wh.length ? wh : ["MSK"]
       });
       logIam("Приглашение: " + String(data.get("fio")).trim() + " · " + ROLE_NAME[data.get("role")] +
         " · склады " + (wh.length ? wh.join(", ") : "MSK"));
