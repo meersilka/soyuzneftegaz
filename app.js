@@ -1061,10 +1061,26 @@
     );
   }
 
+  /* Порядок групп на сайте. Без него группы шли в том порядке, в каком
+     позиции лежат в файлах данных, а не по важности для компании.
+     Группы, которых здесь нет, встают в конец в порядке данных. */
+  const GROUP_ORDER = [
+    "Трубопроводная арматура",
+    "Цветной прокат",
+    "Спецстали",
+    "Деловой лом и остатки",
+    "Чёрный прокат",
+    "Опоры и заглушки поворотные",
+    "Фланцы и фасонные части",
+    "Нержавейка"
+  ];
   function groupNames() {
     const set = [];
     SKU.forEach(function (s) { if (set.indexOf(s.l1) < 0) set.push(s.l1); });
-    return set;
+    return set.sort(function (a, b) {
+      const ia = GROUP_ORDER.indexOf(a), ib = GROUP_ORDER.indexOf(b);
+      return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+    });
   }
   function groupCount(g) { return SKU.filter(function (s) { return s.l1 === g; }).length; }
   /* у групп из каталога 2015 остатков нет — открываем их сразу с фильтром «всё» */
