@@ -881,7 +881,11 @@ a.table__name:hover { color: var(--action); }
 .tabs button[aria-selected="true"] { color: var(--action); border-bottom-color: var(--action); }
 
 .person { display: grid; gap: var(--s-2); padding: var(--s-4) 0; border-bottom: 1px solid var(--line-2); }
-@media (min-width: 760px) { .person { grid-template-columns: 1fr 120px 190px; align-items: center; gap: var(--s-3); } }
+@media (min-width: 760px) {
+  .person { grid-template-columns: 1fr 120px 240px; align-items: center; gap: var(--s-3); }
+  /* плашка статуса по центру своей колонки — так она читается как столбец, а не как хвост строки */
+  .person > div:nth-child(2) { text-align: center; }
+}
 
 .list-check { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s-3); }
 .list-check li { display: flex; gap: 10px; align-items: flex-start; font-size: var(--fs-sm); line-height: 1.5; }
