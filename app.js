@@ -2,7 +2,7 @@
    СоюзНефтеГаз — витрина металлопроката
    Концепция B «Инженерная белизна»
    Бизнес-логика прототипа сохранена: гибрид цен, мультисклад,
-   холд факт-веса, конвертация единиц, подбор по смете,
+   холд факт-веса, конвертация единиц, разбор списка позиций,
    роли и лимиты, резерв счёта 30 минут.
    ============================================================ */
 (function () {
@@ -89,7 +89,7 @@
     slot: "10:00",
     reserveUntil: null,
     facetsOpen: false,
-    smetaRows: null,
+    requestRows: null,
     role: "boss",
     lkTab: "people",
     staff: store("sng_staff", null) || [
@@ -117,7 +117,7 @@
   const PERMS = [
     ["price.b2b",   "Цена компании",                { supply: "Y", boss: "Y", acc: "Y", foreman: "N" }],
     ["cart.edit",   "Корзина и услуги резки",       { supply: "Y", boss: "Y", acc: "N", foreman: "N" }],
-    ["smeta.run",   "Подбор по смете",              { supply: "Y", boss: "Y", acc: "N", foreman: "N" }],
+    ["request.run", "Создать заявку",               { supply: "Y", boss: "Y", acc: "N", foreman: "N" }],
     ["doc.kp",      "Скачать КП",                   { supply: "Y", boss: "Y", acc: "Y", foreman: "N" }],
     ["doc.invoice", "Счёт и резерв 30 минут",       { supply: "C", boss: "Y", acc: "Y", foreman: "N" }],
     ["doc.approve", "Согласовать черновик",         { supply: "N", boss: "Y", acc: "N", foreman: "N" }],
@@ -958,7 +958,7 @@
   const NAV = [
     ["/", "Главная"],
     ["/catalog", "Каталог"],
-    ["/smeta", "Подбор по смете"],
+    ["/request", "Создать заявку"],
     ["/calc", "Калькулятор массы"],
     ["/delivery", "Доставка и оплата"],
     ["/about", "О компании"],
@@ -1040,7 +1040,7 @@
               }).join("") +
             "</ul></div>" +
             '<div><h2>Покупателю</h2><ul class="footer-list">' +
-              '<li><a href="#/smeta">Подбор по смете</a></li>' +
+              '<li><a href="#/request">Создать заявку</a></li>' +
               '<li><a href="#/calc">Калькулятор массы</a></li>' +
               '<li><a href="#/delivery">Доставка и оплата</a></li>' +
               '<li><a href="#/account">Личный кабинет</a></li>' +
@@ -1083,12 +1083,8 @@
     });
   }
   function groupCount(g) { return SKU.filter(function (s) { return s.l1 === g; }).length; }
-  /* у групп из каталога 2015 остатков нет — открываем их сразу с фильтром «всё» */
-  function groupHasStock(g) {
-    return SKU.some(function (s) { return s.l1 === g && stock(s) > 0; });
-  }
   function groupHref(g) {
-    return "#/catalog?l1=" + encodeURIComponent(g) + (groupHasStock(g) ? "" : "&stock=all");
+    return "#/catalog?l1=" + encodeURIComponent(g);
   }
   function typesOf(g) {
     const set = [];
@@ -1173,7 +1169,7 @@
               "или пневмоприводом. Металлопрокат отгружаем со склада: наличие и цена видны сразу, " +
               "счёт для юрлица формируется из корзины.</p>" +
             '<div class="hero__cta">' +
-              '<a class="btn btn--lg" href="#/smeta">Подобрать по смете</a>' +
+              '<a class="btn btn--lg" href="#/request">Создать заявку</a>' +
               '<a class="btn btn--lg btn--secondary" href="#/catalog">Открыть каталог</a>' +
             "</div>" +
             '<div class="hero__meta">' +
@@ -1237,7 +1233,7 @@
             "<h2>От заявки до отгрузки — четыре шага</h2>" +
           "</div>" +
           '<div class="steps reveal">' +
-            '<div class="step"><h3>Заявка или смета</h3><p class="small muted">Пришлите список позиций или загрузите смету в Excel, PDF, DOCX.</p></div>' +
+            '<div class="step"><h3>Заявка</h3><p class="small muted">Пришлите список позиций — текстом или файлом Excel, PDF, DOCX.</p></div>' +
             '<div class="step"><h3>Наличие и расчёт</h3><p class="small muted">Сверяем со складом, считаем массу по ГОСТу и цену по объёму партии.</p></div>' +
             '<div class="step"><h3>Счёт и резерв</h3><p class="small muted">Выставляем счёт, позиции держатся в резерве 30 минут.</p></div>' +
             '<div class="step"><h3>Отгрузка и документы</h3><p class="small muted">Самовывоз по слоту или доставка. После весовой — итоговый УПД.</p></div>' +
@@ -1315,7 +1311,7 @@
     const q = String(state.route.query.get("q") || "").trim().toLowerCase();
     const l1 = state.route.query.get("l1") || "";
     const l2 = state.route.query.get("l2") || "";
-    const onlyStock = state.route.query.get("stock") !== "all";
+    const onlyStock = state.route.query.get("stock") === "in";
 
     let list = SKU.filter(function (s) {
       if (l1 && s.l1 !== l1) return false;
@@ -1329,7 +1325,9 @@
       return false;
     });
 
-    const sort = state.route.query.get("sort") || "name";
+    /* по умолчанию список идёт группами в порядке GROUP_ORDER — так своя
+       продукция, запорная арматура и краны, стоит выше покупного проката */
+    const sort = state.route.query.get("sort") || "group";
     const dir = state.route.query.get("dir") === "desc" ? -1 : 1;
     list = list.slice().sort(function (a, b) {
       if (sort === "price") {
@@ -1341,10 +1339,24 @@
         return (pa - pb) * dir;
       }
       if (sort === "stock") return (stock(a) - stock(b)) * dir;
+      if (sort === "group") {
+        const ga = GROUP_ORDER.indexOf(a.l1), gb = GROUP_ORDER.indexOf(b.l1);
+        if (ga !== gb) return (ga < 0 ? 99 : ga) - (gb < 0 ? 99 : gb);
+        if (L2_ORDER[a.l2] !== L2_ORDER[b.l2]) return L2_ORDER[a.l2] - L2_ORDER[b.l2];
+        return byName(a, b);
+      }
       return byName(a, b) * dir;
     });
     return list;
   }
+
+  /* Внутри группы подгруппы идут в том порядке, в каком они напечатаны
+     в каталоге продукции: сначала краны шаровые, потом клапаны. */
+  const L2_ORDER = (function () {
+    const m = {};
+    SKU.forEach(function (s, i) { if (!(s.l2 in m)) m[s.l2] = i; });
+    return m;
+  })();
 
   /* «Ду 100» должен идти после «Ду 15», а не между 10 и 15 */
   const COLL = new Intl.Collator("ru", { numeric: true, sensitivity: "base" });
@@ -1409,7 +1421,7 @@
     const l1 = state.route.query.get("l1") || "";
     const l2 = state.route.query.get("l2") || "";
     const q = state.route.query.get("q") || "";
-    const onlyStock = state.route.query.get("stock") !== "all";
+    const onlyStock = state.route.query.get("stock") === "in";
     const page = Math.max(1, Number(state.route.query.get("page") || 1));
     const perPage = 24;
     const shown = list.slice(0, page * perPage);
@@ -1433,7 +1445,7 @@
         '<div class="catalog-layout">' +
           '<aside class="facets">' +
             '<button class="btn btn--secondary facets__toggle" id="facetsToggle" aria-expanded="' + (state.facetsOpen ? "true" : "false") + '">' +
-              "Фильтры и поиск" + (l1 || l2 || q || !onlyStock ? " · включены" : "") + "</button>" +
+              "Фильтры и поиск" + (l1 || l2 || q || onlyStock ? " · включены" : "") + "</button>" +
             '<div class="facets__body panel" data-open="' + (state.facetsOpen ? "true" : "false") + '">' +
               '<form id="facetForm">' +
                 '<label class="field">' +
@@ -1699,32 +1711,32 @@
     );
   }
 
-  /* ---- Подбор по смете ---- */
+  /* ---- Создать заявку ---- */
   const LVL = {
     HIGH:   { label: "Точное совпадение", cls: "chip--ok" },
     MID:    { label: "Нужно подтвердить", cls: "chip--warn" },
     REJECT: { label: "Передаём менеджеру", cls: "chip--bad" }
   };
 
-  function viewSmeta() {
-    const rows = state.smetaRows;
+  function viewRequest() {
+    const rows = state.requestRows;
     return (
       '<div class="container section section--tight">' +
-        breadcrumbs([{ label: "Главная", href: "/" }, { label: "Подбор по смете" }]) +
+        breadcrumbs([{ label: "Главная", href: "/" }, { label: "Создать заявку" }]) +
         '<div class="section-head">' +
-          '<p class="eyebrow">Подбор по смете</p>' +
-          '<h1 id="pageTitle" tabindex="-1">Загрузите смету — соберём корзину сами</h1>' +
-          '<p class="lead">Читаем Excel, PDF и DOCX. Сопоставляем строки сметы с позициями склада и показываем, ' +
-            "где совпало точно, а где нужно ваше подтверждение. Рукописные сметы передаём менеджеру.</p>" +
+          '<p class="eyebrow">Заявка</p>' +
+          '<h1 id="pageTitle" tabindex="-1">Создать заявку — пришлите список позиций</h1>' +
+          '<p class="lead">Читаем Excel, PDF и DOCX. Сверяем каждую строку вашего списка с каталогом и показываем, ' +
+            "где совпало точно, а где нужно ваше подтверждение. Что не разобрали — передаём менеджеру.</p>" +
         "</div>" +
 
         (!rows
           ? '<div class="panel">' +
               '<div class="empty" style="border-style:dashed">' +
-                '<h2 style="font-size:1.125rem">Перетащите файл сметы сюда</h2>' +
+                '<h2 style="font-size:1.125rem">Перетащите файл со списком сюда</h2>' +
                 '<p class="small muted" style="margin-top:8px">Excel, PDF или DOCX, до 20 МБ</p>' +
                 '<div class="row" style="justify-content:center;margin-top:20px">' +
-                  '<button class="btn btn--lg" id="runSmeta">Показать на примере сметы</button>' +
+                  '<button class="btn btn--lg" id="runDemo">Показать на готовом примере</button>' +
                 "</div>" +
                 '<p class="xs muted" style="margin-top:14px">В прототипе разбор файла показан на готовом примере.</p>' +
               "</div>" +
@@ -1733,7 +1745,7 @@
               '<div class="table-scroll" style="border:0">' +
                 '<table class="table table--stack">' +
                   "<thead><tr>" +
-                    '<th scope="col">Строка сметы</th>' +
+                    '<th scope="col">Строка заявки</th>' +
                     '<th scope="col">Позиция склада</th>' +
                     '<th scope="col">Результат</th>' +
                     '<th scope="col"><span class="visually-hidden">Действие</span></th>' +
@@ -1742,7 +1754,7 @@
                     const lv = LVL[r.lvl];
                     return (
                       "<tr>" +
-                        '<td data-l="Строка сметы">' + esc(r.src) + "</td>" +
+                        '<td data-l="Строка заявки">' + esc(r.src) + "</td>" +
                         '<td data-l="Позиция склада">' + esc(r.dst) + "</td>" +
                         '<td data-l="Результат"><span class="chip ' + lv.cls + '">' + esc(lv.label) + "</span></td>" +
                         "<td>" +
@@ -1761,7 +1773,7 @@
                   "<span>Позиции с пометкой «нужно подтвердить» сами в корзину не попадают: у них несколько подходящих вариантов.</span></div>" +
                 '<div class="row" style="margin-top:18px">' +
                   '<button class="btn btn--lg" id="moveHigh">Перенести точные совпадения в корзину</button>' +
-                  '<button class="btn btn--secondary" id="resetSmeta">Загрузить другую смету</button>' +
+                  '<button class="btn btn--secondary" id="resetRequest">Загрузить другой файл</button>' +
                 "</div>" +
               "</div>" +
             "</div>") +
@@ -1913,10 +1925,10 @@
           breadcrumbs([{ label: "Главная", href: "/" }, { label: "Корзина" }]) +
           '<h1 id="pageTitle" tabindex="-1">Корзина пуста</h1>' +
           '<div class="empty" style="margin-top:24px">' +
-            '<p class="lead">Добавьте позиции из каталога или загрузите смету — соберём корзину за вас.</p>' +
+            '<p class="lead">Добавьте позиции из каталога или пришлите список — соберём корзину за вас.</p>' +
             '<div class="row" style="justify-content:center;margin-top:20px">' +
               '<a class="btn btn--lg" href="#/catalog">Открыть каталог</a>' +
-              '<a class="btn btn--lg btn--secondary" href="#/smeta">Загрузить смету</a>' +
+              '<a class="btn btn--lg btn--secondary" href="#/request">Прислать список</a>' +
             "</div>" +
           "</div>" +
         "</div>"
@@ -2206,7 +2218,7 @@
               "<h2 style=\"font-size:1.0625rem\">Чем занимаемся</h2>" +
               '<ul class="list-check" style="margin-top:14px">' +
                 "<li>Металлопрокат и трубопроводная арматура со склада</li>" +
-                "<li>Подбор позиций по смете заказчика</li>" +
+                "<li>Подбор позиций по списку заказчика</li>" +
                 "<li>Резка в размер и упаковка партии</li>" +
                 "<li>Отгрузка юрлицам по счёту с НДС и физлицам с чеком</li>" +
               "</ul>" +
@@ -2535,7 +2547,7 @@
 
   /* ---------- 8. Роутер ---------- */
   const VIEWS = {
-    home: viewHome, catalog: viewCatalog, product: viewProduct, smeta: viewSmeta,
+    home: viewHome, catalog: viewCatalog, product: viewProduct, request: viewRequest,
     calc: viewCalc, cart: viewCart, checkout: viewCheckout, account: viewAccount,
     about: viewAbout, delivery: viewDelivery, contacts: viewContacts, privacy: viewPrivacy
   };
@@ -2543,7 +2555,7 @@
   const TITLES = {
     home: "СоюзНефтеГаз — трубопроводная арматура и металлопрокат, Челябинск",
     catalog: "Каталог продукции", product: "Позиция каталога",
-    smeta: "Подбор по смете", calc: "Калькулятор массы металла",
+    request: "Создать заявку", calc: "Калькулятор массы металла",
     cart: "Корзина", checkout: "Оформление заказа", account: "Личный кабинет",
     about: "О компании и реквизиты", delivery: "Доставка и оплата",
     contacts: "Контакты", privacy: "Политика конфиденциальности"
@@ -2712,7 +2724,7 @@
           q: String(d.get("q") || "").trim(),
           l1: d.get("l1") || "",
           l2: d.get("l2") || "",
-          stock: d.get("stock") === "all" ? "all" : "",
+          stock: d.get("stock") === "in" ? "in" : "",
           page: ""
         });
       });
@@ -2775,10 +2787,10 @@
       addToCart(s.id, tons);
     });
 
-    /* смета */
-    const runSmeta = $("#runSmeta");
-    if (runSmeta) runSmeta.addEventListener("click", function () {
-      state.smetaRows = [
+    /* заявка списком */
+    const runDemo = $("#runDemo");
+    if (runDemo) runDemo.addEventListener("click", function () {
+      state.requestRows = [
         { src: "Арматура 12 А500С — 4,8 т", dst: "Арматура А500С Ø12 мм, МД 11.7", lvl: "HIGH", id: "ARM-A500-12-MD" },
         { src: "Лист 10 ст3 — 8 т", dst: "Лист г/к ст3 10 мм, 1500×6000", lvl: "HIGH", id: "SH-HR-ST3-10-1500x6000" },
         { src: "304-я 2 мм — 1,2 т", dst: "Лист н/ж AISI 304, 2 мм — нужно выбрать отделку", lvl: "MID", id: "SS-304-2-1250x2500-M" },
@@ -2787,8 +2799,8 @@
       ];
       render();
     });
-    const resetSmeta = $("#resetSmeta");
-    if (resetSmeta) resetSmeta.addEventListener("click", function () { state.smetaRows = null; render(); });
+    const resetRequest = $("#resetRequest");
+    if (resetRequest) resetRequest.addEventListener("click", function () { state.requestRows = null; render(); });
     $$("[data-add]").forEach(function (b) {
       b.addEventListener("click", function () {
         const id = b.dataset.add;
@@ -2801,7 +2813,7 @@
     });
     const moveHigh = $("#moveHigh");
     if (moveHigh) moveHigh.addEventListener("click", function () {
-      const list = (state.smetaRows || []).filter(function (r) { return r.lvl === "HIGH" && r.id; });
+      const list = (state.requestRows || []).filter(function (r) { return r.lvl === "HIGH" && r.id; });
       if (!list.length) { toast("Нечего переносить"); return; }
       list.forEach(function (r) { addToCart(r.id, 1); });
       go("#/cart");
