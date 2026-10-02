@@ -41,6 +41,8 @@
   function save(key, value) {
     try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) { /* приватный режим */ }
   }
+  /* штат до смены ролей лежал под ключами без версии — убираем остаток */
+  try { localStorage.removeItem("sng_staff"); localStorage.removeItem("sng_audit"); } catch (e) { /* приватный режим */ }
 
   /* ---------- 1. Компания (карточка партнёра) ---------- */
   const CO = {
@@ -92,14 +94,14 @@
     requestRows: null,
     role: "boss",
     lkTab: "people",
-    staff: store("sng_staff", null) || [
+    staff: store("sng_staff_v2", null) || [
       { id: "u1", fio: "ХХХХХХ Х. А.",  mail: "boss@example.ru",    role: "boss",    status: "active",  wh: ["MSK", "SPB", "EKB"] },
       { id: "u2", fio: "ХХХХХХ Х. В.",  mail: "komdir@example.ru",  role: "supply",  status: "active",  wh: ["MSK", "SPB"] },
       { id: "u3", fio: "ХХХХХХ Х. О.",  mail: "sales2@example.ru",  role: "foreman", status: "invited", wh: ["EKB"] },
       { id: "u4", fio: "ХХХХХХ Х. Н.",  mail: "buh@example.ru",     role: "acc",     status: "active",  wh: ["MSK", "SPB", "EKB"] },
       { id: "u5", fio: "ХХХХХХ Х. Д.",  mail: "sales@example.ru",   role: "foreman", status: "active",  wh: ["MSK"] }
     ],
-    audit: store("sng_audit", null) || [
+    audit: store("sng_audit_v2", null) || [
       { t: "11.09.2026 16:40", who: "ХХХХХХ Х. А.", text: "Приглашён коммерческий директор · склады Москва, Санкт-Петербург" },
       { t: "11.09.2026 16:51", who: "ХХХХХХ Х. А.", text: "Отделу продаж выдан доступ на склад Москва" }
     ]
@@ -233,7 +235,8 @@
      чтобы не было нерабочих ссылок tel: */
   const TEL = CO.phoneHref ? "tel:" + CO.phoneHref : "#/contacts";
 
-  function saveIam() { save("sng_staff", state.staff); save("sng_audit", state.audit); }
+  /* ключ с версией: при смене учебного штата старый набор из браузера не всплывает */
+  function saveIam() { save("sng_staff_v2", state.staff); save("sng_audit_v2", state.audit); }
   const canIam = () => state.role === "boss";
   function logIam(text) {
     const t = new Date().toLocaleString("ru-RU", {
@@ -1171,7 +1174,8 @@
               "Поставляем <em>металлопрокат</em> со склада.</h1>" +
             '<p class="hero__lead lead"><b class="strong">Краны шаровые</b>, отводы, фланцы, опоры и заглушки ' +
               "поворотные — делаем с любой строительной длиной и комплектуем редуктором, электро- " +
-              "или пневмоприводом. Металлопрокат отгружаем со склада: наличие и цена видны сразу, " +
+              'или пневмоприводом. <b class="strong">Металлопрокат</b> отгружаем со склада: ' +
+              "наличие и цена видны сразу, " +
               "счёт для юрлица формируется из корзины.</p>" +
             '<div class="hero__cta">' +
               '<a class="btn btn--lg" href="#/request">Создать заявку</a>' +
