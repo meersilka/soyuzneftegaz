@@ -3,7 +3,7 @@
    Концепция B «Инженерная белизна»
    Бизнес-логика прототипа сохранена: гибрид цен, мультисклад,
    холд факт-веса, конвертация единиц, разбор списка позиций,
-   роли и лимиты, резерв счёта 30 минут.
+   роли и доступы, резерв счёта 30 минут.
    ============================================================ */
 (function () {
   "use strict";
@@ -93,15 +93,15 @@
     role: "boss",
     lkTab: "people",
     staff: store("sng_staff", null) || [
-      { id: "u1", fio: "ХХХХХХ Х. А.",    mail: "boss@example.ru",     role: "boss",    status: "active",  wh: ["MSK", "SPB", "EKB"], limit: 1800000, invoice: true,  pay: true },
-      { id: "u2", fio: "ХХХХХХ Х. В.",   mail: "snab@example.ru",   role: "supply",  status: "active",  wh: ["MSK", "SPB"],        limit: 400000,  invoice: true,  pay: false },
-      { id: "u3", fio: "ХХХХХХ Х. О.",    mail: "snab2@example.ru",   role: "supply",  status: "invited", wh: ["EKB"],               limit: 150000,  invoice: false, pay: false },
-      { id: "u4", fio: "ХХХХХХ Х. Н.",    mail: "buh@example.ru",      role: "acc",     status: "active",  wh: ["MSK", "SPB", "EKB"], limit: 0,       invoice: false, pay: true },
-      { id: "u5", fio: "ХХХХХХ Х. Д.",    mail: "prorab@example.ru",   role: "foreman", status: "active",  wh: ["MSK"],               limit: 0,       invoice: false, pay: false }
+      { id: "u1", fio: "ХХХХХХ Х. А.",    mail: "boss@example.ru",     role: "boss",    status: "active",  wh: ["MSK", "SPB", "EKB"], invoice: true,  pay: true },
+      { id: "u2", fio: "ХХХХХХ Х. В.",   mail: "komdir@example.ru", role: "supply",  status: "active",  wh: ["MSK", "SPB"],        invoice: true,  pay: false },
+      { id: "u3", fio: "ХХХХХХ Х. О.",    mail: "sales2@example.ru",  role: "foreman", status: "invited", wh: ["EKB"],               invoice: false, pay: false },
+      { id: "u4", fio: "ХХХХХХ Х. Н.",    mail: "buh@example.ru",      role: "acc",     status: "active",  wh: ["MSK", "SPB", "EKB"], invoice: false, pay: true },
+      { id: "u5", fio: "ХХХХХХ Х. Д.",    mail: "sales@example.ru",    role: "foreman", status: "active",  wh: ["MSK"],               invoice: false, pay: false }
     ],
     audit: store("sng_audit", null) || [
-      { t: "11.09.2026 16:40", who: "ХХХХХХ Х. А.", text: "Приглашён снабженец · лимит 400 000 ₽" },
-      { t: "11.09.2026 16:51", who: "ХХХХХХ Х. А.", text: "Прорабу выдан доступ на склад Москва" }
+      { t: "11.09.2026 16:40", who: "ХХХХХХ Х. А.", text: "Приглашён коммерческий директор · склады Москва, Санкт-Петербург" },
+      { t: "11.09.2026 16:51", who: "ХХХХХХ Х. А.", text: "Отделу продаж выдан доступ на склад Москва" }
     ]
   };
 
@@ -112,7 +112,13 @@
   };
   const WH_KEYS = Object.keys(WH);
 
-  const ROLE_NAME = { boss: "Руководитель", supply: "Снабженец", acc: "Бухгалтер", foreman: "Прораб" };
+  /* Ключи ролей внутри кода остались прежними, видны только названия. */
+  const ROLE_NAME = {
+    boss: "Руководитель",
+    supply: "Коммерческий директор",
+    acc: "Главный бухгалтер",
+    foreman: "Отдел продаж"
+  };
 
   const PERMS = [
     ["price.b2b",   "Цена компании",                { supply: "Y", boss: "Y", acc: "Y", foreman: "N" }],
@@ -128,8 +134,7 @@
     ["order.track", "Статус отгрузки и фото",       { supply: "Y", boss: "Y", acc: "Y", foreman: "Y" }],
     ["gate.qr",     "Пропуск на склад",             { supply: "C", boss: "Y", acc: "N", foreman: "Y" }],
     ["iam.invite",  "Приглашать сотрудников",       { supply: "N", boss: "Y", acc: "N", foreman: "N" }],
-    ["iam.roles",   "Менять роли и лимиты",         { supply: "N", boss: "Y", acc: "N", foreman: "N" }],
-    ["credit.see",  "Видеть лимит компании",        { supply: "N", boss: "Y", acc: "Y", foreman: "N" }]
+    ["iam.roles",   "Менять роли и доступы",        { supply: "N", boss: "Y", acc: "N", foreman: "N" }]
   ];
 
   /* ---------- 3. Бизнес-логика ---------- */
@@ -2072,7 +2077,7 @@
                       '<span class="radio-tile__d">Обычная безналичная оплата, резерв на 30 минут</span></span></label>' +
                     '<label class="radio-tile"><input type="radio" name="pay" value="delay" />' +
                       '<span><span class="radio-tile__t">Оплата с отсрочки</span>' +
-                      '<span class="radio-tile__d">Доступно по согласованному лимиту компании</span></span></label>' +
+                      '<span class="radio-tile__d">Доступно по согласованию с менеджером</span></span></label>' +
                   "</div>" +
                 "</div>"
               : '<div class="panel" style="margin-top:16px">' +
@@ -2265,7 +2270,7 @@
             "<h2 style=\"font-size:1.0625rem\">Оплата</h2>" +
             '<ul class="list-check" style="margin-top:14px">' +
               "<li>Юридическим лицам — счёт с НДС 20%, закрывающие документы и УПД</li>" +
-              "<li>По согласованному лимиту возможна отсрочка платежа</li>" +
+              "<li>Отсрочка платежа — по согласованию с менеджером</li>" +
               "<li>Физическим лицам — карта или СБП, чек по 54-ФЗ</li>" +
               "<li>Деловой лом идёт отдельным счётом: по нему НДС платит покупатель как налоговый агент, статья 161 НК</li>" +
             "</ul>" +
@@ -2368,7 +2373,7 @@
   /* ---- Личный кабинет ---- */
   function viewAccount() {
     const tabs = [["people", "Сотрудники"], ["matrix", "Права"], ["invite", "Пригласить"], ["audit", "Журнал"]];
-    const roles = [["boss", "Руководитель"], ["supply", "Снабженец"], ["acc", "Бухгалтер"], ["foreman", "Прораб"]];
+    const roles = Object.keys(ROLE_NAME).map(function (k) { return [k, ROLE_NAME[k]]; });
 
     return (
       '<div class="container section section--tight">' +
@@ -2426,8 +2431,7 @@
                 '<div class="xs muted">склады: ' + esc(s.wh.map(function (w) { return WH[w] ? WH[w].short : w; }).join(", ")) + "</div></div>" +
               '<div><span class="chip ' + badge + '">' + esc(badgeText) + "</span></div>" +
               '<div class="xs muted">' +
-                (s.role === "boss" ? "лимит компании" : s.limit ? "лимит " + fmt(s.limit) + " ₽" : "без личного лимита") +
-                "<br>счёт: " + (s.invoice ? "да" : "нет") + " · оплата: " + (s.pay ? "да" : "нет") +
+                "счёт: " + (s.invoice ? "да" : "нет") + " · оплата: " + (s.pay ? "да" : "нет") +
               "</div>" +
               "<div>" +
                 (canIam() && s.role !== "boss"
@@ -2468,13 +2472,14 @@
         '<div class="table-scroll" style="margin-top:16px;border:0">' +
           '<table class="matrix">' +
             "<thead><tr>" +
-              '<th scope="col">Действие</th><th scope="col">Снабженец</th><th scope="col">Руководитель</th>' +
-              '<th scope="col">Бухгалтер</th><th scope="col">Прораб</th>' +
+              '<th scope="col">Действие</th><th scope="col">' + esc(ROLE_NAME.boss) + "</th>" +
+              '<th scope="col">' + esc(ROLE_NAME.supply) + '</th><th scope="col">' + esc(ROLE_NAME.acc) + "</th>" +
+              '<th scope="col">' + esc(ROLE_NAME.foreman) + "</th>" +
             "</tr></thead><tbody>" +
             PERMS.map(function (p) {
               return "<tr><th scope=\"row\">" + esc(p[1]) + "</th>" +
-                permCell(p[2].supply, "Снабженец") + permCell(p[2].boss, "Руководитель") +
-                permCell(p[2].acc, "Бухгалтер") + permCell(p[2].foreman, "Прораб") + "</tr>";
+                permCell(p[2].boss, ROLE_NAME.boss) + permCell(p[2].supply, ROLE_NAME.supply) +
+                permCell(p[2].acc, ROLE_NAME.acc) + permCell(p[2].foreman, ROLE_NAME.foreman) + "</tr>";
             }).join("") +
             "</tbody></table>" +
         "</div>" +
@@ -2485,7 +2490,7 @@
   function lkInvite() {
     if (!canIam()) {
       return '<div class="panel"><p class="small">Приглашать сотрудников может только руководитель — ' +
-        "иначе размывается ответственность за резерв и лимит компании.</p></div>";
+        "иначе размывается ответственность за резерв и заказы компании.</p></div>";
     }
     return (
       '<form class="panel" id="inviteForm" novalidate>' +
@@ -2500,16 +2505,14 @@
               '<input class="input" name="mail" placeholder="сотрудник@company.ru" required />' +
               '<span class="field__error">Нужен контакт для приглашения</span></label>' +
           "</div>" +
-          '<div class="field-row field-row--2">' +
+          '<div class="field-row">' +
             '<label class="field"><span class="field__label">Роль</span>' +
               '<select class="select" name="role">' +
-                '<option value="supply">Снабженец</option><option value="acc">Бухгалтер</option>' +
-                '<option value="foreman">Прораб</option><option value="boss">Ещё один руководитель</option>' +
+                '<option value="supply">' + esc(ROLE_NAME.supply) + "</option>" +
+                '<option value="acc">' + esc(ROLE_NAME.acc) + "</option>" +
+                '<option value="foreman">' + esc(ROLE_NAME.foreman) + "</option>" +
+                '<option value="boss">Ещё один руководитель</option>' +
               "</select></label>" +
-            '<label class="field" data-field="limit"><span class="field__label">Личный лимит, ₽</span>' +
-              '<input class="input" name="limit" type="number" min="0" step="1000" value="0" />' +
-              '<span class="field__hint">Не выше лимита компании 1 800 000 ₽</span>' +
-              '<span class="field__error">Лимит сотрудника не может превышать лимит компании</span></label>' +
           "</div>" +
           '<fieldset style="border:0;padding:0;margin:20px 0 0">' +
             '<legend class="field__label" style="padding:0">Доступные склады</legend>' +
@@ -2915,8 +2918,7 @@
       e.preventDefault();
       const data = validate(inviteForm, {
         fio: RULE_NAME,
-        mail: function (v) { return String(v || "").trim().length >= 5; },
-        limit: function (v, d) { return d.get("role") !== "supply" || Number(v || 0) <= 1800000; }
+        mail: function (v) { return String(v || "").trim().length >= 5; }
       });
       if (!data) return;
       const wh = $$(".invWh").filter(function (x) { return x.checked; }).map(function (x) { return x.value; });
@@ -2927,7 +2929,6 @@
         role: data.get("role"),
         status: "invited",
         wh: wh.length ? wh : ["MSK"],
-        limit: Number(data.get("limit") || 0),
         invoice: data.get("invoice") === "on",
         pay: data.get("role") === "acc"
       });
