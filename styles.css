@@ -464,44 +464,12 @@ a.card__title:hover { color: var(--action); }
 .hero__figure svg { position: relative; width: 100%; height: auto; }
 .hero__figcap { position: relative; margin-top: var(--s-4); display: flex; justify-content: space-between; gap: var(--s-3); flex-wrap: wrap; }
 
-/* объёмная модель профиля в первом экране */
-.viewer__stage {
-  position: relative; z-index: 1;
-  aspect-ratio: 4 / 3;
-  max-height: 320px;
-  min-height: 210px;
-}
-/* На узком экране min-height вместе с aspect-ratio требовал ширины 280 px,
-   из-за чего весь первый блок распирало шире экрана и текст обрезался
-   (.hero { overflow: hidden } это прятало). Высоту берём от ширины. */
-@media (max-width: 560px) {
-  .viewer__stage { min-height: 0; }
-}
-.viewer__canvas {
-  width: 100%; height: 100%; display: block;
-  border-radius: var(--r-2);
-  cursor: grab;
-  /* по вертикали палец листает страницу, по горизонтали крутит модель */
-  touch-action: pan-y;
-}
-.viewer__canvas:active { cursor: grabbing; }
-.viewer__hint {
-  position: absolute; left: 50%; bottom: 2px; transform: translateX(-50%);
-  font-family: var(--mono); font-size: var(--fs-mono-lbl);
-  letter-spacing: .14em; text-transform: uppercase; color: var(--muted);
-  background: rgba(255, 255, 255, .82); border: 1px solid var(--line-2);
-  padding: 5px 11px; border-radius: var(--r-pill);
-  pointer-events: none; white-space: nowrap;
-}
-.viewer__hint[hidden] { display: none; }
-.viewer__tabs {
-  position: relative; z-index: 1; display: flex; width: 100%;
-  justify-content: center; margin-top: var(--s-4);
-}
-/* пять изделий должны помещаться в один ряд, на телефоне — в два */
-.segmented.viewer__tabs button { padding: 8px 11px; font-size: var(--fs-xs); }
-@media (max-width: 440px) {
-  .segmented.viewer__tabs button { padding: 7px 7px; font-size: 11px; letter-spacing: -0.01em; }
+/* снимок изделия в первом экране (раньше здесь была объёмная модель) */
+.hero__figure--shot { background: #FFFFFF; padding: var(--s-4); }
+.hero__figure--shot::before { content: none; }
+.hero__shot {
+  position: relative; z-index: 1; display: block;
+  width: 100%; height: auto; max-height: 340px; object-fit: contain;
 }
 
 .trust { display: grid; gap: 1px; background: var(--line-2); border-block: 1px solid var(--line-2); grid-template-columns: 1fr 1fr; }

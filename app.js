@@ -1,9 +1,9 @@
 /* ============================================================
    СоюзНефтеГаз — витрина металлопроката
    Концепция B «Инженерная белизна»
-   Бизнес-логика прототипа сохранена: гибрид цен, мультисклад,
-   холд факт-веса, конвертация единиц, разбор списка позиций,
-   роли и доступы, резерв счёта 30 минут.
+   Бизнес-логика прототипа сохранена: гибрид цен, холд факт-веса,
+   конвертация единиц, разбор списка позиций, роли и доступы,
+   резерв счёта 30 минут. Складские остатки на сайте не публикуются.
    ============================================================ */
 (function () {
   "use strict";
@@ -146,25 +146,10 @@
     .concat(Array.isArray(window.SNG_ARM) ? window.SNG_ARM : []);
   const byReq = (s) => !!(s && s.req);
 
-  const stock     = (s) => Number(s[WH[state.wh].key] || 0);
-  const stockAt   = (s, w) => Number(s[WH[w].key] || 0);
   const pubPrice  = (s) => Number(s.p1t || 0);
   const b2bPrice  = (s) => Math.round(pubPrice(s) * 0.94);
   const priceNow  = (s) => (state.auth ? b2bPrice(s) : pubPrice(s));
-  const isScrap   = (s) => s.vat && String(s.vat).includes("161");
   const isLong    = (s) => /11\.7|МД 12/.test(String(s.mer));
-
-  function stockKind(v) { return v <= 0 ? "out" : v < 2 ? "low" : "ok"; }
-  function stockText(v) {
-    if (v <= 0) return "под заказ";
-    if (v < 2) return "мало · " + fmt2(v) + " т";
-    return "на складе " + fmt2(v) + " т";
-  }
-  function statusHtml(v, s) {
-    if (byReq(s)) return '<span class="status status--req">под заказ</span>';
-    const k = stockKind(v);
-    return '<span class="status status--' + k + '">' + esc(stockText(v)) + "</span>";
-  }
 
   function unitOptions(s) {
     if (s.unit === "кг") return ["kg"];
@@ -279,19 +264,15 @@
         '<circle cx="' + cx + '" cy="' + cy + '" r="42" ' + gf + "/>" +
         '<path d="M' + (cx - 30) + ' ' + (cy - 26) + ' l60 12 M' + (cx - 34) + ' ' + (cy - 6) + ' l68 12 M' + (cx - 30) + ' ' + (cy + 16) + ' l60 12" stroke="' + C_LINE + '" stroke-width="2" opacity=".55"/>' +
         '<line x1="' + (cx - 42) + '" y1="' + cy + '" x2="' + (cx + 42) + '" y2="' + cy + '" ' + dim + "/>";
-    } else if (/Круг|Катанка|Вольфрам|Молибден|Тантал|Нихром|Инструментальная/.test(t)) {
+    } else if (/Круг|Вал|Титан|Магний|Инвар|Ковар|Вольфрам|Молибден|Тантал|Нихром/.test(t)) {
       body =
         '<circle cx="' + cx + '" cy="' + cy + '" r="42" ' + gf + "/>" +
         '<line x1="' + (cx - 42) + '" y1="' + cy + '" x2="' + (cx + 42) + '" y2="' + cy + '" ' + dim + "/>";
-    } else if (/Швеллер/.test(t)) {
-      body = '<path d="M64 26 h40 v12 h-28 v68 h28 v12 h-40 z" ' + gf + "/>";
-    } else if (/Балка/.test(t)) {
-      body = '<path d="M62 26 h96 v12 h-42 v68 h42 v12 h-96 v-12 h42 v-68 h-42 z" ' + gf + "/>";
-    } else if (/Уголок/.test(t)) {
-      body = '<path d="M64 26 h14 v80 h72 v14 h-86 z" ' + gf + "/>";
-    } else if (/Шестигранник/.test(t)) {
-      body = '<path d="M110 28 l38 22 v44 l-38 22 -38-22 v-44 z" ' + gf + "/>";
-    } else if (/Лист|Полоса|Шина/.test(t)) {
+    } else if (/Кольц|Диск/.test(t)) {
+      body =
+        '<circle cx="' + cx + '" cy="' + cy + '" r="46" ' + gf + "/>" +
+        '<circle cx="' + cx + '" cy="' + cy + '" r="20" fill="#fff" stroke="' + C_LINE + '" stroke-width="2"/>';
+    } else if (/Лист|Плит|Лента|Магнитно|Шина/.test(t)) {
       body =
         '<path d="M42 58 h136 v30 h-136 z" ' + gf + "/>" +
         '<path d="M42 58 l16-14 h136 l-16 14" fill="rgba(0,145,208,.04)" stroke="' + C_LINE + '" stroke-width="2"/>' +
@@ -357,11 +338,6 @@
         '<path d="M48 60 h124" ' + g + "/>" +
         '<path d="M88 72 h44 v22 h-44 z" ' + gf + "/>" +
         '<path d="M58 104 h104" ' + g + "/>";
-    } else if (/лом|Некондиция/i.test(t)) {
-      body =
-        '<path d="M52 96 h40 l14-26 h34 l10 26 h30" ' + g + "/>" +
-        '<rect x="70" y="44" width="34" height="22" rx="2" ' + gf + "/>" +
-        '<rect x="116" y="52" width="46" height="16" rx="2" ' + gf + "/>";
     } else {
       body = '<rect x="58" y="42" width="104" height="60" rx="4" ' + gf + "/>";
     }
@@ -391,12 +367,18 @@
     const g = 'fill="none" stroke="currentColor" stroke-width="2.2"';
     const soft = 'fill="rgba(0,145,208,.08)" stroke="currentColor" stroke-width="2.2"';
     let inner;
-    if (/Нержавейка/.test(name)) {
+    if (/Нержавеющие/.test(name)) {
       inner = '<circle cx="34" cy="34" r="22" ' + soft + '/><circle cx="34" cy="34" r="13" ' + g + '/><path d="M18 18 l32 32" ' + g + ' opacity=".4"/>';
-    } else if (/Цветной/.test(name)) {
+    } else if (/Цветные/.test(name)) {
       inner = '<rect x="10" y="30" width="48" height="14" rx="2" ' + soft + '/><rect x="18" y="14" width="32" height="12" rx="2" ' + g + "/>";
-    } else if (/Спецстали/.test(name)) {
+    } else if (/Жаропрочные|Инструментальные/.test(name)) {
       inner = '<path d="M34 8 l22 13 v26 l-22 13 -22-13 v-26 z" ' + soft + '/><path d="M34 22 v24" ' + g + "/>";
+    } else if (/Поковки/.test(name)) {
+      inner = '<circle cx="34" cy="34" r="23" ' + soft + '/><circle cx="34" cy="34" r="10" fill="#fff" ' + g + "/>";
+    } else if (/Прецизионные/.test(name)) {
+      inner = '<rect x="10" y="26" width="48" height="16" rx="3" ' + soft + '/><path d="M18 34 h32" ' + g + "/>";
+    } else if (/Тугоплавкие/.test(name)) {
+      inner = '<rect x="14" y="20" width="40" height="28" rx="3" ' + soft + '/><path d="M14 34 h40 M28 20 v28 M42 20 v28" ' + g + ' opacity=".5"/>';
     } else if (/арматура/i.test(name)) {
       inner = '<rect x="22" y="26" width="24" height="17" rx="4" ' + soft + "/>" +
         '<rect x="8" y="22" width="8" height="25" rx="1.5" ' + g + "/>" +
@@ -409,533 +391,29 @@
       inner = '<path d="M8 26 h52" ' + g + "/>" +
         '<path d="M24 32 h20 v12 h-20 z" ' + soft + "/>" +
         '<path d="M14 54 h40" ' + g + "/>";
-    } else if (/лом|остатки/i.test(name)) {
-      inner = '<path d="M8 50 h18 l10-18 h16 l8 18 h4" ' + g + '/><rect x="16" y="16" width="20" height="12" rx="2" ' + soft + "/>";
     } else {
-      inner = '<path d="M10 10 h44 v9 h-17 v34 h17 v9 h-44 v-9 h17 v-34 h-17 z" ' + soft + "/>";
+      inner = '<circle cx="34" cy="34" r="22" ' + soft + '/><path d="M12 34 h44" ' + g + ' opacity=".45"/>';
     }
     return '<svg viewBox="0 0 68 68" aria-hidden="true" focusable="false">' + inner + "</svg>";
   }
 
-  /* ---------- 4б. Объёмная сборка изделия ----------
-     Свой маленький рендерер на canvas: без внешних библиотек,
-     чтобы сайт по-прежнему работал без интернета и открывался файлом.
-     Модель не просто вращается — детали прилетают по очереди и собираются
-     в изделие, а свежий срез металла остывает с оранжевого до синего. */
+  /* ---------- 4б. Главный кадр ----------
+     Раньше здесь крутилась объёмная модель на canvas: ~500 строк своего
+     рендерера и анимация в каждом кадре. Убрали по просьбе заказчика —
+     на слабых машинах она грузила процессор, а пользы давала мало.
+     Вместо неё снимок изделия из «Каталога продукции 2015». */
 
-  const SHAPES = [
-    ["valve",  "Кран шаровый", "Кран шаровый фланцевый в сборе"],
-    ["elbow",  "Отвод",  "Отвод 90° с фланцами"],
-    ["flange", "Фланец", "Фланец с крепёжными болтами"],
-    ["bolt",   "Крепёж", "Болт с шайбой и гайкой"],
-    ["beam",   "Двутавр", "Балка двутавровая"]
-  ];
-  let heroShape = "valve";
-  let heroViewer = null;
-
-  function heroViewerHtml() {
-    const cur = SHAPES.filter(function (s) { return s[0] === heroShape; })[0] || SHAPES[0];
+  function heroFigureHtml() {
     return (
-      '<figure class="hero__figure viewer" style="margin:0">' +
-        '<div class="viewer__stage">' +
-          '<canvas class="viewer__canvas" id="heroCanvas" tabindex="0" role="img" ' +
-            'aria-label="Объёмная модель: ' + attr(cur[2]) + '. Потяните мышью или стрелками, чтобы повернуть"></canvas>' +
-          '<span class="viewer__hint" id="heroHint">Потяните, чтобы повернуть</span>' +
-        "</div>" +
-        '<div class="segmented viewer__tabs" role="group" aria-label="Какое изделие показать">' +
-          SHAPES.map(function (s) {
-            return '<button type="button" data-shape="' + attr(s[0]) + '" aria-pressed="' +
-              (s[0] === heroShape ? "true" : "false") + '">' + esc(s[1]) + "</button>";
-          }).join("") +
-        "</div>" +
+      '<figure class="hero__figure hero__figure--shot" style="margin:0">' +
+        '<img class="hero__shot" src="assets/photo/kran-flancevyj.jpg" alt="Кран шаровый фланцевый" ' +
+          'width="900" height="600" decoding="async" />' +
         '<figcaption class="hero__figcap">' +
-          '<span class="eyebrow" id="heroCap">' + esc(cur[2]) + "</span>" +
+          '<span class="eyebrow">Кран шаровый фланцевый в сборе</span>' +
           '<span class="eyebrow">' + esc(pos(SKU.length)) + " в каталоге</span>" +
         "</figcaption>" +
       "</figure>"
     );
-  }
-
-  /* ---- примитивы: всё собирается из четырёх- и многоугольных граней ---- */
-
-  const TAU = Math.PI * 2;
-
-  /* прямоугольный брусок */
-  function boxFaces(x0, y0, z0, x1, y1, z1) {
-    const p = [
-      [x0, y0, z0], [x1, y0, z0], [x1, y1, z0], [x0, y1, z0],
-      [x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1]
-    ];
-    return [[0, 1, 2, 3], [5, 4, 7, 6], [4, 0, 3, 7], [1, 5, 6, 2], [4, 5, 1, 0], [3, 2, 6, 7]]
-      .map(function (f) { return { v: f.map(function (k) { return p[k]; }), soft: false }; });
-  }
-
-  /* труба или сплошной цилиндр вдоль оси Z; r = 0 — сплошной */
-  function tubeFaces(R, r, z0, z1, N) {
-    const f = [];
-    const co = [], ci = [];
-    for (let i = 0; i <= N; i++) {
-      const a = (i / N) * TAU;
-      co.push([R * Math.cos(a), R * Math.sin(a)]);
-      ci.push([r * Math.cos(a), r * Math.sin(a)]);
-    }
-    for (let i = 0; i < N; i++) {
-      const A = co[i], B = co[i + 1];
-      f.push({ v: [[A[0], A[1], z0], [B[0], B[1], z0], [B[0], B[1], z1], [A[0], A[1], z1]], soft: true });
-      if (r > 0) {
-        const a = ci[i], b = ci[i + 1];
-        f.push({ v: [[b[0], b[1], z0], [a[0], a[1], z0], [a[0], a[1], z1], [b[0], b[1], z1]], soft: true });
-        f.push({ v: [[A[0], A[1], z0], [a[0], a[1], z0], [b[0], b[1], z0], [B[0], B[1], z0]], soft: true });
-        f.push({ v: [[A[0], A[1], z1], [B[0], B[1], z1], [b[0], b[1], z1], [a[0], a[1], z1]], soft: true });
-      } else {
-        f.push({ v: [[0, 0, z0], [B[0], B[1], z0], [A[0], A[1], z0]], soft: true });
-        f.push({ v: [[0, 0, z1], [A[0], A[1], z1], [B[0], B[1], z1]], soft: true });
-      }
-    }
-    return f;
-  }
-
-  /* правильная призма вдоль Z — головка болта, гайка */
-  function prismFaces(R, sides, z0, z1) {
-    const f = [], p = [];
-    for (let i = 0; i < sides; i++) {
-      const a = (i / sides) * TAU + Math.PI / sides;
-      p.push([R * Math.cos(a), R * Math.sin(a)]);
-    }
-    for (let i = 0; i < sides; i++) {
-      const A = p[i], B = p[(i + 1) % sides];
-      f.push({ v: [[A[0], A[1], z0], [B[0], B[1], z0], [B[0], B[1], z1], [A[0], A[1], z1]], soft: false });
-    }
-    f.push({ v: p.map(function (q) { return [q[0], q[1], z1]; }), soft: false });
-    f.push({ v: p.slice().reverse().map(function (q) { return [q[0], q[1], z0]; }), soft: false });
-    return f;
-  }
-
-  /* шар запорного элемента */
-  function ballFaces(R, NU, NV) {
-    const f = [];
-    for (let i = 0; i < NV; i++) {
-      const t0 = (i / NV) * Math.PI, t1 = ((i + 1) / NV) * Math.PI;
-      for (let j = 0; j < NU; j++) {
-        const a0 = (j / NU) * TAU, a1 = ((j + 1) / NU) * TAU;
-        const P = function (t, a) {
-          return [R * Math.sin(t) * Math.cos(a), R * Math.cos(t), R * Math.sin(t) * Math.sin(a)];
-        };
-        f.push({ v: [P(t0, a0), P(t0, a1), P(t1, a1), P(t1, a0)], soft: true });
-      }
-    }
-    return f;
-  }
-
-  /* дуга трубы в плоскости XY — отвод */
-  function arcTubeFaces(bendR, R, r, a0, a1, NA, NC) {
-    const f = [];
-    const pt = function (a, phi, rad) {
-      const u = [Math.cos(a), Math.sin(a), 0];
-      return [
-        bendR * u[0] + rad * Math.cos(phi) * u[0],
-        bendR * u[1] + rad * Math.cos(phi) * u[1],
-        rad * Math.sin(phi)
-      ];
-    };
-    for (let i = 0; i < NA; i++) {
-      const A = a0 + (a1 - a0) * (i / NA), B = a0 + (a1 - a0) * ((i + 1) / NA);
-      for (let j = 0; j < NC; j++) {
-        const p0 = (j / NC) * TAU, p1 = ((j + 1) / NC) * TAU;
-        f.push({ v: [pt(A, p0, R), pt(B, p0, R), pt(B, p1, R), pt(A, p1, R)], soft: true });
-        f.push({ v: [pt(A, p1, r), pt(B, p1, r), pt(B, p0, r), pt(A, p0, r)], soft: true });
-      }
-    }
-    for (let j = 0; j < NC; j++) {
-      const p0 = (j / NC) * TAU, p1 = ((j + 1) / NC) * TAU;
-      f.push({ v: [pt(a0, p0, R), pt(a0, p1, R), pt(a0, p1, r), pt(a0, p0, r)], soft: true });
-      f.push({ v: [pt(a1, p0, r), pt(a1, p1, r), pt(a1, p1, R), pt(a1, p0, R)], soft: true });
-    }
-    return f;
-  }
-
-  /* ---- преобразования готовых наборов граней ---- */
-
-  function mapPts(faces, fn) {
-    return faces.map(function (f) { return { v: f.v.map(fn), soft: f.soft }; });
-  }
-  function moveF(faces, dx, dy, dz) {
-    return mapPts(faces, function (p) { return [p[0] + dx, p[1] + dy, p[2] + dz]; });
-  }
-  /* поворот заготовки, построенной вдоль Z, на другую ось */
-  function alongX(faces) { return mapPts(faces, function (p) { return [p[2], p[1], -p[0]]; }); }
-  function alongY(faces) { return mapPts(faces, function (p) { return [p[0], p[2], -p[1]]; }); }
-
-  /* деталь сборки: откуда прилетает, когда и с каким доворотом */
-  function part(faces, from, t0, t1, rot, pivot, axis) {
-    return {
-      faces: faces, from: from || [0, 0, 0], t0: t0, t1: t1,
-      rot: rot || 0, pivot: pivot || [0, 0, 0], axis: axis || "z"
-    };
-  }
-
-  function buildShape(kind) {
-    if (kind === "elbow") {
-      const B = 152, R = 46, r = 31, NC = 14;
-      const seg = [];
-      for (let i = 0; i < 4; i++) {
-        const a0 = (Math.PI / 2) * (i / 4), a1 = (Math.PI / 2) * ((i + 1) / 4);
-        seg.push(part(arcTubeFaces(B, R, r, a0, a1, 4, NC),
-          [0, 0, 210], 0.02 + i * 0.12, 0.26 + i * 0.12));
-      }
-      return seg.concat([
-        part(moveF(alongY(tubeFaces(R, r, 0, 62, NC)), B, -62, 0), [0, -250, 0], 0.50, 0.72),
-        part(moveF(alongX(tubeFaces(R, r, 0, 62, NC)), -62, B, 0), [-250, 0, 0], 0.56, 0.78),
-        part(moveF(alongY(tubeFaces(84, r, 0, 24, 20)), B, -86, 0), [0, -300, 0], 0.70, 0.90),
-        part(moveF(alongX(tubeFaces(84, r, 0, 24, 20)), -86, B, 0), [-300, 0, 0], 0.78, 1.00)
-      ]);
-    }
-
-    if (kind === "flange") {
-      const list = [
-        part(tubeFaces(126, 46, -18, 18, 22), [0, 0, 300], 0.00, 0.26),
-        part(tubeFaces(76, 46, 18, 56, 20), [0, 0, 240], 0.18, 0.42),
-        part(tubeFaces(60, 46, 56, 92, 20), [0, 0, 220], 0.28, 0.52)
-      ];
-      const NB = 8;
-      for (let i = 0; i < NB; i++) {
-        const a = (i / NB) * TAU + Math.PI / NB;
-        const x = 96 * Math.cos(a), y = 96 * Math.sin(a);
-        const bolt = moveF(tubeFaces(11, 0, -40, 34, 10), x, y, 0)
-          .concat(moveF(prismFaces(19, 6, 34, 54), x, y, 0));
-        list.push(part(bolt, [0, 0, 200], 0.44 + i * 0.05, 0.64 + i * 0.05, -2.4, [x, y, 0]));
-      }
-      return list;
-    }
-
-    if (kind === "bolt") {
-      return [
-        part(alongX(tubeFaces(27, 0, -160, 116, 18)), [-300, 0, 0], 0.00, 0.26),
-        part(alongX(prismFaces(54, 6, 116, 176)), [300, 0, 0], 0.18, 0.44),
-        part(alongX(tubeFaces(64, 29, -106, -86, 20)), [-300, 0, 0], 0.40, 0.64),
-        part(alongX(prismFaces(52, 6, -86, -34)), [-330, 0, 0], 0.60, 1.00, -6.3, [0, 0, 0], "x")
-      ];
-    }
-
-    if (kind === "beam") {
-      const L = 150;
-      return [
-        part(boxFaces(-6, -86, -L, 6, 86, L), [0, 0, 240], 0.00, 0.30),
-        part(boxFaces(-56, 86, -L, 56, 100, L), [0, 230, 0], 0.22, 0.56),
-        part(boxFaces(-56, -100, -L, 56, -86, L), [0, -230, 0], 0.40, 0.76)
-      ];
-    }
-
-    /* кран шаровой фланцевый — по умолчанию */
-    const NP = 20;
-    return [
-      part(ballFaces(60, 12, 8), [0, 250, 0], 0.00, 0.22),
-      part(alongX(tubeFaces(78, 0, -92, 92, 22)), [0, 0, 260], 0.14, 0.40),
-      part(alongX(tubeFaces(48, 31, -156, -92, NP)), [-280, 0, 0], 0.30, 0.54),
-      part(alongX(tubeFaces(48, 31, 92, 156, NP)), [280, 0, 0], 0.30, 0.54),
-      part(alongX(tubeFaces(92, 31, -176, -156, NP)), [-330, 0, 0], 0.46, 0.70),
-      part(alongX(tubeFaces(92, 31, 156, 176, NP)), [330, 0, 0], 0.46, 0.70),
-      part(alongY(tubeFaces(17, 0, 66, 140, 14)), [0, 280, 0], 0.60, 0.80),
-      part(
-        boxFaces(-14, 140, -15, 150, 162, 15).concat(moveF(alongX(tubeFaces(19, 0, -10, 10, 12)), 150, 151, 0)),
-        [0, 120, 0], 0.74, 1.00, -1.15, [0, 140, 0]
-      )
-    ];
-  }
-
-  function initHeroViewer() {
-    const canvas = document.getElementById("heroCanvas");
-    if (!canvas || !canvas.getContext) return null;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return null;
-
-    const hint = document.getElementById("heroHint");
-    const cap = document.getElementById("heroCap");
-    const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-    const LIGHT = (function () {
-      const v = [-0.34, 0.60, 0.72], m = Math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
-      return [v[0] / m, v[1] / m, v[2] / m];
-    })();
-    const DARK = [0, 88, 132], BASE = [0, 145, 208], LITE = [122, 210, 246];
-    const HOT = [231, 128, 52];
-    const mixc = function (c1, c2, t) {
-      return [
-        Math.round(c1[0] + (c2[0] - c1[0]) * t),
-        Math.round(c1[1] + (c2[1] - c1[1]) * t),
-        Math.round(c1[2] + (c2[2] - c1[2]) * t)
-      ];
-    };
-    const rgb = function (c) { return "rgb(" + c[0] + "," + c[1] + "," + c[2] + ")"; };
-    const tone = function (t, hot) {
-      let c = t < 0.5 ? mixc(DARK, BASE, t * 2) : mixc(BASE, LITE, (t - 0.5) * 2);
-      if (hot > 0) c = mixc(c, HOT, hot * 0.92);
-      return rgb(c);
-    };
-
-    const ASM_MS = 2800;
-    let parts = buildShape(heroShape);
-    let asmFrom = 0, asm = reduce ? 1 : 0;
-    let modelR = 1;
-
-    function measure() {
-      modelR = 1;
-      parts.forEach(function (pt) {
-        pt.faces.forEach(function (f) {
-          f.v.forEach(function (p) {
-            const d = Math.sqrt(p[0] * p[0] + p[1] * p[1] + p[2] * p[2]);
-            if (d > modelR) modelR = d;
-          });
-        });
-      });
-    }
-    measure();
-
-    /* у каждого изделия свой стартовый ракурс — так форма читается лучше всего */
-    const START = {
-      valve:  [-0.30, 0.58],
-      elbow:  [-0.30, 0.40],
-      flange: [-0.40, 0.66],
-      bolt:   [-0.34, 0.52],
-      beam:   [-0.34, 0.62]
-    };
-    const startAngles = function () { return START[heroShape] || START.valve; };
-    let rotX = startAngles()[0], rotY = startAngles()[1];
-    let auto = !reduce, dragging = false, touched = false;
-    let lastX = 0, lastY = 0, raf = 0, w = 0, h = 0, dpr = 1;
-    let visible = true, alive = true, needs = true;
-
-    function restart() {
-      asm = reduce ? 1 : 0;
-      asmFrom = (window.performance && performance.now) ? performance.now() : Date.now();
-      needs = true;
-    }
-    restart();
-
-    function resize() {
-      const rect = canvas.getBoundingClientRect();
-      dpr = Math.min(window.devicePixelRatio || 1, 2);
-      w = Math.max(1, Math.round(rect.width));
-      h = Math.max(1, Math.round(rect.height));
-      canvas.width = Math.round(w * dpr);
-      canvas.height = Math.round(h * dpr);
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      needs = true;
-    }
-
-    const easeOut = function (t) { return 1 - Math.pow(1 - t, 3); };
-
-    function draw() {
-      ctx.clearRect(0, 0, w, h);
-      if (w < 8 || h < 8) return;
-
-      const cam = 760, focal = 680;
-      const scale = (Math.min(w, h) * 0.42) / (modelR * (focal / cam));
-      const ox = w / 2, oy = h / 2;
-      const cx = Math.cos(rotX), sx = Math.sin(rotX);
-      const cy = Math.cos(rotY), sy = Math.sin(rotY);
-
-      const sh = ctx.createRadialGradient(ox, h * 0.9, 1, ox, h * 0.9, Math.min(w, h) * 0.42);
-      sh.addColorStop(0, "rgba(17,26,32,.16)");
-      sh.addColorStop(1, "rgba(17,26,32,0)");
-      ctx.fillStyle = sh;
-      ctx.beginPath();
-      ctx.ellipse(ox, h * 0.9, Math.min(w, h) * 0.40, Math.min(w, h) * 0.072, 0, 0, Math.PI * 2);
-      ctx.fill();
-
-      const list = [];
-      for (let n = 0; n < parts.length; n++) {
-        const pt = parts[n];
-        const raw = pt.t1 > pt.t0 ? (asm - pt.t0) / (pt.t1 - pt.t0) : 1;
-        const p = Math.max(0, Math.min(1, raw));
-        if (p <= 0) continue;
-        const e = easeOut(p);
-        const k = 1 - e;                       /* 1 — деталь ещё в полёте, 0 — на месте */
-        const alpha = Math.min(1, p * 4);
-        const hot = Math.pow(1 - p, 1.5);      /* свежий срез остывает */
-        const ca = Math.cos(pt.rot * k), sa = Math.sin(pt.rot * k);
-        const ax = pt.axis;
-
-        for (let i = 0; i < pt.faces.length; i++) {
-          const src = pt.faces[i].v, pts = [];
-          let zs = 0;
-          for (let j = 0; j < src.length; j++) {
-            let X = src[j][0], Y = src[j][1], Z = src[j][2];
-            if (pt.rot) {
-              if (ax === "x") {
-                const dy = Y - pt.pivot[1], dz = Z - pt.pivot[2];
-                Y = pt.pivot[1] + dy * ca - dz * sa;
-                Z = pt.pivot[2] + dy * sa + dz * ca;
-              } else if (ax === "y") {
-                const dz = Z - pt.pivot[2], dx2 = X - pt.pivot[0];
-                Z = pt.pivot[2] + dz * ca - dx2 * sa;
-                X = pt.pivot[0] + dz * sa + dx2 * ca;
-              } else {
-                const dx = X - pt.pivot[0], dy = Y - pt.pivot[1];
-                X = pt.pivot[0] + dx * ca - dy * sa;
-                Y = pt.pivot[1] + dx * sa + dy * ca;
-              }
-            }
-            X += pt.from[0] * k; Y += pt.from[1] * k; Z += pt.from[2] * k;
-            const x1 = X * cy + Z * sy;
-            const z1 = -X * sy + Z * cy;
-            const y2 = Y * cx - z1 * sx;
-            const z2 = Y * sx + z1 * cx;
-            pts.push([x1, y2, z2]);
-            zs += z2;
-          }
-          list.push({ pts: pts, z: zs / src.length, soft: pt.faces[i].soft, a: alpha, hot: hot });
-        }
-      }
-      list.sort(function (p, q) { return p.z - q.z; });
-
-      ctx.lineJoin = "round";
-      for (let i = 0; i < list.length; i++) {
-        const it = list[i], pts = it.pts;
-        const ax = pts[1][0] - pts[0][0], ay = pts[1][1] - pts[0][1], az = pts[1][2] - pts[0][2];
-        const bx = pts[2][0] - pts[0][0], by = pts[2][1] - pts[0][1], bz = pts[2][2] - pts[0][2];
-        let nx = ay * bz - az * by, ny = az * bx - ax * bz, nz = ax * by - ay * bx;
-        const nm = Math.sqrt(nx * nx + ny * ny + nz * nz) || 1;
-        nx /= nm; ny /= nm; nz /= nm;
-        if (nz < 0) { nx = -nx; ny = -ny; nz = -nz; }
-        const dot = Math.max(0, nx * LIGHT[0] + ny * LIGHT[1] + nz * LIGHT[2]);
-
-        ctx.globalAlpha = it.a;
-        ctx.beginPath();
-        for (let j = 0; j < pts.length; j++) {
-          const p = pts[j];
-          const k = focal / (cam - p[2]);
-          const X = ox + p[0] * k * scale;
-          const Y = oy - p[1] * k * scale;
-          if (j === 0) ctx.moveTo(X, Y); else ctx.lineTo(X, Y);
-        }
-        ctx.closePath();
-        const fill = tone(0.14 + 0.86 * dot, it.hot);
-        ctx.fillStyle = fill;
-        ctx.fill();
-        /* на круглых поверхностях обводим цветом заливки — иначе видны швы сегментов */
-        ctx.lineWidth = it.hot > 0.04 ? 1.6 : 1;
-        ctx.strokeStyle = it.hot > 0.04
-          ? rgb(mixc([11, 16, 20], HOT, Math.min(1, it.hot + 0.35)))
-          : (it.soft ? fill : "rgba(11,16,20,.20)");
-        ctx.stroke();
-      }
-      ctx.globalAlpha = 1;
-    }
-
-    function loop() {
-      if (!alive) return;
-      const on = visible && !document.hidden;
-      if (on && asm < 1) {
-        const now = (window.performance && performance.now) ? performance.now() : Date.now();
-        asm = Math.min(1, (now - asmFrom) / ASM_MS);
-        needs = true;
-      }
-      if (auto && on) { rotY += 0.0042; needs = true; }
-      if (needs && on) { draw(); needs = false; }
-      raf = requestAnimationFrame(loop);
-    }
-
-    function stopAuto() {
-      if (!touched) {
-        touched = true;
-        auto = false;
-        if (hint) hint.hidden = true;
-      }
-    }
-
-    /* Перетаскивание слушаем на окне: так вращение не обрывается,
-       если курсор или палец ушёл за пределы модели. */
-    function onMove(e) {
-      if (!dragging) return;
-      rotY += (e.clientX - lastX) * 0.009;
-      rotX += (e.clientY - lastY) * 0.007;
-      rotX = Math.max(-1.25, Math.min(1.25, rotX));
-      lastX = e.clientX; lastY = e.clientY;
-      needs = true;
-      if (e.cancelable) e.preventDefault();
-    }
-    function onUp() {
-      if (!dragging) return;
-      dragging = false;
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
-      window.removeEventListener("pointercancel", onUp);
-    }
-    function onDown(e) {
-      dragging = true;
-      stopAuto();
-      lastX = e.clientX; lastY = e.clientY;
-      window.addEventListener("pointermove", onMove, { passive: false });
-      window.addEventListener("pointerup", onUp);
-      window.addEventListener("pointercancel", onUp);
-    }
-
-    function onKey(e) {
-      const step = 0.16;
-      if (e.key === "ArrowLeft") rotY -= step;
-      else if (e.key === "ArrowRight") rotY += step;
-      else if (e.key === "ArrowUp") rotX = Math.max(-1.25, rotX - step);
-      else if (e.key === "ArrowDown") rotX = Math.min(1.25, rotX + step);
-      else if (e.key === "Enter" || e.key === " ") { restart(); e.preventDefault(); return; }
-      else return;
-      e.preventDefault();
-      stopAuto();
-      needs = true;
-    }
-
-    canvas.addEventListener("pointerdown", onDown);
-    canvas.addEventListener("keydown", onKey);
-
-    let ro = null;
-    if ("ResizeObserver" in window) {
-      ro = new ResizeObserver(resize);
-      ro.observe(canvas);
-    } else window.addEventListener("resize", resize);
-
-    let io = null;
-    if ("IntersectionObserver" in window) {
-      io = new IntersectionObserver(function (entries) {
-        visible = entries[0].isIntersecting;
-        if (visible) needs = true;
-      }, { threshold: 0.05 });
-      io.observe(canvas);
-    }
-
-    $$("[data-shape]").forEach(function (b) {
-      b.addEventListener("click", function () {
-        /* повторное нажатие на активную вкладку пересобирает изделие заново */
-        heroShape = b.dataset.shape;
-        parts = buildShape(heroShape);
-        measure();
-        rotX = startAngles()[0]; rotY = startAngles()[1];
-        restart();
-        $$("[data-shape]").forEach(function (x) {
-          x.setAttribute("aria-pressed", x.dataset.shape === heroShape ? "true" : "false");
-        });
-        const cur = SHAPES.filter(function (s) { return s[0] === heroShape; })[0];
-        if (cap && cur) cap.textContent = cur[2];
-        if (cur) canvas.setAttribute("aria-label",
-          "Объёмная модель: " + cur[2] + ". Потяните мышью или стрелками, чтобы повернуть");
-      });
-    });
-
-    resize();
-    loop();
-
-    return {
-      destroy: function () {
-        alive = false;
-        if (raf) cancelAnimationFrame(raf);
-        if (ro) ro.disconnect(); else window.removeEventListener("resize", resize);
-        if (io) io.disconnect();
-        canvas.removeEventListener("pointerdown", onDown);
-        canvas.removeEventListener("keydown", onKey);
-        window.removeEventListener("pointermove", onMove);
-        window.removeEventListener("pointerup", onUp);
-        window.removeEventListener("pointercancel", onUp);
-      }
-    };
   }
 
   function icon(name) {
@@ -983,7 +461,7 @@
   function header() {
     return (
       '<div class="notice-bar"><div class="container">' +
-        "<span>Демонстрационная версия. Каталог, остатки, цены, список складов и сотрудники в кабинете — " +
+        "<span>Демонстрационная версия. Цены, список складов и сотрудники в кабинете — " +
         "учебный набор данных. Реквизиты компании, телефон и город — настоящие.</span>" +
       "</div></div>" +
       '<header class="site-header">' +
@@ -1074,13 +552,15 @@
      Группы, которых здесь нет, встают в конец в порядке данных. */
   const GROUP_ORDER = [
     "Трубопроводная арматура",
-    "Цветной прокат",
-    "Спецстали",
-    "Деловой лом и остатки",
-    "Чёрный прокат",
     "Опоры и заглушки поворотные",
     "Фланцы и фасонные части",
-    "Нержавейка"
+    "Нержавеющие стали",
+    "Жаропрочные и жаростойкие сплавы",
+    "Поковки",
+    "Прецизионные сплавы",
+    "Цветные сплавы",
+    "Тугоплавкие металлы",
+    "Инструментальные стали"
   ];
   function groupNames() {
     const set = [];
@@ -1156,14 +636,19 @@
 
   function viewHome() {
     const groups = groupNames();
-    /* по одной позиции из разных типов — чтобы витрина не была восемью арматурами подряд */
-    const seenTypes = {};
-    const inStock = SKU.filter(function (s) {
-      if (!(stock(s) > 5 && s.p1t) || seenTypes[s.l2]) return false;
-      seenTypes[s.l2] = true;
+    /* по одной позиции из разных типов — чтобы витрина не была восемью кранами подряд.
+       Сначала те, у кого есть снимок: витрина с фотографиями читается лучше. */
+    const seenGroups = {};
+    const showcase = groupNames().map(function (g) {
+      const inGroup = SKU.filter(function (s) { return s.l1 === g; });
+      /* внутри группы вперёд те, у кого есть снимок */
+      inGroup.sort(function (a, b) { return (b.photo ? 1 : 0) - (a.photo ? 1 : 0); });
+      return inGroup[0];
+    }).filter(function (s) {
+      if (!s || seenGroups[s.l1]) return false;
+      seenGroups[s.l1] = true;
       return true;
     }).slice(0, 8);
-    const totalTons = SKU.reduce(function (a, s) { return a + stock(s); }, 0);
 
     return (
       '<section class="hero">' +
@@ -1171,12 +656,12 @@
           "<div>" +
             '<p class="eyebrow eyebrow--brand">' + esc(CO.tagline) + "</p>" +
             '<h1 class="hero__title" id="pageTitle" tabindex="-1">Изготавливаем трубопроводную арматуру.<br>' +
-              "Поставляем <em>металлопрокат</em> со склада.</h1>" +
+              "Поставляем <em>металлопрокат</em> под задачу.</h1>" +
             '<p class="hero__lead lead"><b class="strong">Краны шаровые</b>, отводы, фланцы, опоры и заглушки ' +
               "поворотные — делаем с любой строительной длиной и комплектуем редуктором, электро- " +
-              'или пневмоприводом. <b class="strong">Металлопрокат</b> отгружаем со склада: ' +
-              "наличие и цена видны сразу, " +
-              "счёт для юрлица формируется из корзины.</p>" +
+              'или пневмоприводом. <b class="strong">Металлопрокат</b> — нержавеющие и ' +
+              "жаропрочные стали, поковки, прецизионные и цветные сплавы. " +
+              "Пришлите список позиций — вернёмся с ценой и сроком.</p>" +
             '<div class="hero__cta">' +
               '<a class="btn btn--lg" href="#/request">Создать заявку</a>' +
               '<a class="btn btn--lg btn--secondary" href="#/catalog">Открыть каталог</a>' +
@@ -1184,18 +669,17 @@
             '<div class="hero__meta">' +
               '<span class="chip chip--brand">Изготовление по чертежу заказчика</span>' +
               '<span class="chip">Счёт и УПД</span>' +
-              '<span class="chip">Резерв 30 минут</span>' +
               '<span class="chip">Резка в размер</span>' +
               '<span class="chip">Самовывоз и доставка</span>' +
             "</div>" +
           "</div>" +
-          '<div class="hero__aside">' + heroViewerHtml() + "</div>" +
+          '<div class="hero__aside">' + heroFigureHtml() + "</div>" +
         "</div>" +
         '<div class="container"><div class="trust">' +
           '<div class="trust__item"><div class="trust__v">с ' + esc(String(CO.since)) + "</div><div class=\"trust__l\">" + YEARS + " лет в ЕГРЮЛ</div></div>" +
           '<div class="trust__item"><div class="trust__v">' + esc(CO.inn) + '</div><div class="trust__l">ИНН — проверьте нас</div></div>' +
           '<div class="trust__item"><div class="trust__v">НДС 20%</div><div class="trust__l">счёт, УПД, ЭДО</div></div>' +
-          '<div class="trust__item"><div class="trust__v">' + fmt2(totalTons) + ' т</div><div class="trust__l">на складе ' + esc(WH[state.wh].short) + "</div></div>" +
+          '<div class="trust__item"><div class="trust__v">' + esc(String(SKU.length)) + '</div><div class="trust__l">позиций в каталоге</div></div>' +
         "</div></div>" +
       "</section>" +
 
@@ -1203,9 +687,9 @@
         '<div class="container">' +
           '<div class="section-head reveal">' +
             '<p class="eyebrow">Что возим</p>' +
-            "<h2>Что изготавливаем и что возим со склада</h2>" +
-            '<p class="lead">Внутри группы — фильтры по типу, марке и ГОСТу. У проката видно наличие на трёх складах сразу. ' +
-              "Арматуру, фланцы и опоры подбираем под задачу — по ним цена и срок по запросу.</p>" +
+            "<h2>Что изготавливаем и что поставляем</h2>" +
+            '<p class="lead">Внутри группы — фильтры по типу, марке и ГОСТу. ' +
+              "Всё поставляем под заказ: цену и срок считаем по вашему списку.</p>" +
           "</div>" +
           '<div class="grid grid--3 reveal">' +
             groups.map(function (g) {
@@ -1226,12 +710,12 @@
         '<div class="container">' +
           '<div class="row row--between reveal" style="margin-bottom:24px">' +
             '<div class="section-head" style="margin:0">' +
-              '<p class="eyebrow">Со склада сегодня</p>' +
-              "<h2>Есть в наличии прямо сейчас</h2>" +
+              '<p class="eyebrow">Что в каталоге</p>' +
+              "<h2>Из номенклатуры</h2>" +
             "</div>" +
             '<a class="btn btn--secondary" href="#/catalog">Весь каталог</a>' +
           "</div>" +
-          '<div class="grid grid--auto reveal">' + inStock.map(cardHtml).join("") + "</div>" +
+          '<div class="grid grid--auto reveal">' + showcase.map(cardHtml).join("") + "</div>" +
         "</div>" +
       "</section>" +
 
@@ -1243,9 +727,9 @@
           "</div>" +
           '<div class="steps reveal">' +
             '<div class="step"><h3>Заявка</h3><p class="small muted">Пришлите список позиций — текстом или файлом Excel, PDF, DOCX.</p></div>' +
-            '<div class="step"><h3>Наличие и расчёт</h3><p class="small muted">Сверяем со складом, считаем массу по ГОСТу и цену по объёму партии.</p></div>' +
-            '<div class="step"><h3>Счёт и резерв</h3><p class="small muted">Выставляем счёт, позиции держатся в резерве 30 минут.</p></div>' +
-            '<div class="step"><h3>Отгрузка и документы</h3><p class="small muted">Самовывоз по слоту или доставка. После весовой — итоговый УПД.</p></div>' +
+            '<div class="step"><h3>Расчёт</h3><p class="small muted">Подбираем марку и размер, считаем массу по ГОСТу, даём цену и срок.</p></div>' +
+            '<div class="step"><h3>Счёт и договор</h3><p class="small muted">Выставляем счёт на юрлицо, работаем с НДС и по ЭДО.</p></div>' +
+            '<div class="step"><h3>Отгрузка и документы</h3><p class="small muted">Самовывоз или доставка. После отгрузки — УПД.</p></div>' +
           "</div>" +
         "</div>" +
       "</section>" +
@@ -1291,8 +775,6 @@
   }
 
   function cardHtml(s) {
-    const st = stock(s);
-    const other = WH_KEYS.filter(function (w) { return w !== state.wh && stockAt(s, w) > 0; });
     return (
       '<article class="card">' +
         '<div class="card__media' + (s.photo ? " card__media--photo" : "") + '">' + mediaHtml(s) + "</div>" +
@@ -1306,10 +788,6 @@
               (state.auth && s.p1t ? '<span class="price__was">' + fmt(pubPrice(s)) + "</span>" : "") +
             "</span>" +
           "</div>" +
-          statusHtml(st, s) +
-          (other.length
-            ? '<p class="xs muted">есть ещё: ' + esc(other.map(function (w) { return WH[w].short; }).join(", ")) + "</p>"
-            : "") +
         "</div>" +
       "</article>"
     );
@@ -1320,12 +798,10 @@
     const q = String(state.route.query.get("q") || "").trim().toLowerCase();
     const l1 = state.route.query.get("l1") || "";
     const l2 = state.route.query.get("l2") || "";
-    const onlyStock = state.route.query.get("stock") === "in";
 
     let list = SKU.filter(function (s) {
       if (l1 && s.l1 !== l1) return false;
       if (l2 && s.l2 !== l2) return false;
-      if (onlyStock && stock(s) <= 0) return false;
       if (!q) return true;
       const blob = [s.id, s.name, s.mark, s.gost, s.aisi, s.size, s.l2].join(" ").toLowerCase();
       if (blob.indexOf(q) >= 0) return true;
@@ -1347,7 +823,6 @@
         if (!pb) return -1;
         return (pa - pb) * dir;
       }
-      if (sort === "stock") return (stock(a) - stock(b)) * dir;
       if (sort === "group") {
         const ga = GROUP_ORDER.indexOf(a.l1), gb = GROUP_ORDER.indexOf(b.l1);
         if (ga !== gb) return (ga < 0 ? 99 : ga) - (gb < 0 ? 99 : gb);
@@ -1430,7 +905,6 @@
     const l1 = state.route.query.get("l1") || "";
     const l2 = state.route.query.get("l2") || "";
     const q = state.route.query.get("q") || "";
-    const onlyStock = state.route.query.get("stock") === "in";
     const page = Math.max(1, Number(state.route.query.get("page") || 1));
     const perPage = 24;
     const shown = list.slice(0, page * perPage);
@@ -1446,7 +920,6 @@
           '<p class="eyebrow">Каталог</p>' +
           '<h1 id="pageTitle" tabindex="-1">' + esc(l2 || l1 || "Весь сортамент") + "</h1>" +
           '<p class="lead">' + esc(pos(list.length)) +
-            (list.every(byReq) ? "" : " · склад " + esc(WH[state.wh].name)) +
             (state.auth && !list.every(byReq) ? " · цена компании −6%" : "") + "</p>" +
         "</div>" +
         (/арматура/i.test(l1) || /шаров|клапан/i.test(l2) ? kshCodeHtml() : "") +
@@ -1454,27 +927,12 @@
         '<div class="catalog-layout">' +
           '<aside class="facets">' +
             '<button class="btn btn--secondary facets__toggle" id="facetsToggle" aria-expanded="' + (state.facetsOpen ? "true" : "false") + '">' +
-              "Фильтры и поиск" + (l1 || l2 || q || onlyStock ? " · включены" : "") + "</button>" +
+              "Фильтры и поиск" + (l1 || l2 || q ? " · включены" : "") + "</button>" +
             '<div class="facets__body panel" data-open="' + (state.facetsOpen ? "true" : "false") + '">' +
               '<form id="facetForm">' +
                 '<label class="field">' +
                   '<span class="field__label">Поиск по названию, ГОСТу, размеру</span>' +
                   '<input class="input" name="q" type="search" value="' + attr(q) + '" placeholder="12-ка, 304-я 2 мм, труба 57" />' +
-                "</label>" +
-                '<label class="field">' +
-                  '<span class="field__label">Склад отгрузки</span>' +
-                  '<select class="select" name="wh">' +
-                    WH_KEYS.map(function (w) {
-                      return '<option value="' + attr(w) + '"' + (state.wh === w ? " selected" : "") + ">" + esc(WH[w].name) + "</option>";
-                    }).join("") +
-                  "</select>" +
-                "</label>" +
-                '<label class="field">' +
-                  '<span class="field__label">Наличие</span>' +
-                  '<select class="select" name="stock">' +
-                    '<option value="in"' + (onlyStock ? " selected" : "") + ">Только то, что на складе</option>" +
-                    '<option value="all"' + (!onlyStock ? " selected" : "") + ">Всё, включая под заказ</option>" +
-                  "</select>" +
                 "</label>" +
                 '<label class="field">' +
                   '<span class="field__label">Группа</span>' +
@@ -1516,7 +974,6 @@
                       '<th scope="col" class="th-photo"><span class="visually-hidden">Фото</span></th>' +
                       sortHead("name", "Наименование") +
                       '<th scope="col">Марка / размер</th>' +
-                      sortHead("stock", "Наличие") +
                       sortHead("price", shown.every(byReq) ? "Цена" : "₽ за тонну", "num") +
                       '<th scope="col"><span class="visually-hidden">Действие</span></th>' +
                     "</tr></thead><tbody>" +
@@ -1530,7 +987,6 @@
                           '<td><a class="table__name" href="#/product/' + encodeURIComponent(s.id) + '">' + esc(s.name) + "</a>" +
                             '<div class="xs muted">' + esc(subLabel(s)) + "</div></td>" +
                           "<td>" + esc(s.mark) + '<div class="xs muted">' + esc(s.size) + "</div></td>" +
-                          "<td>" + statusHtml(stock(s), s) + "</td>" +
                           '<td class="num">' +
                             (s.p1t ? fmt(priceNow(s))
                               : byReq(s) ? '<span class="xs price-req">по запросу</span>'
@@ -1539,8 +995,8 @@
                           "<td>" + (byReq(s)
                             ? '<a class="btn btn--sm btn--secondary" href="#/contacts?item=' +
                               encodeURIComponent(s.id) + '">Запросить</a>'
-                            : '<button class="btn btn--sm btn--secondary" data-quick="' + attr(s.id) + '"' +
-                              (stock(s) <= 0 ? " disabled" : "") + ">В корзину</button>") + "</td>" +
+                            : '<button class="btn btn--sm btn--secondary" data-quick="' + attr(s.id) + '">' +
+                              "В корзину</button>") + "</td>" +
                         "</tr>"
                       );
                     }).join("") +
@@ -1569,7 +1025,6 @@
         "</div>"
       );
     }
-    const st = stock(s);
     const units = unitOptions(s);
     if (units.indexOf(state.unit) < 0) state.unit = units[0];
     const tons = toTons(s, state.unit, state.qty);
@@ -1641,16 +1096,10 @@
                   }).join("") +
                   "</tbody></table>"
                 : "") +
-              '<div style="margin-top:18px">' + statusHtml(st, s) + "</div>" +
-              (byReq(s)
-                ? ""
-                : '<p class="xs muted" style="margin-top:8px">Другие склады: ' +
-                  WH_KEYS.filter(function (w) { return w !== state.wh; })
-                    .map(function (w) { return esc(WH[w].short) + " " + fmt2(stockAt(s, w)) + " т"; }).join(" · ") +
-                  "</p>") +
+              '<div style="margin-top:18px"><span class="status status--req">под заказ</span></div>' +
             "</div>" +
 
-            (st > 0 && p
+            (p
               ? '<div class="panel" style="margin-top:16px">' +
                   "<h2 style=\"font-size:1.0625rem\">Сколько нужно</h2>" +
                   (units.length > 1
@@ -1671,10 +1120,6 @@
                     ? '<div class="callout callout--warn" style="margin-top:14px"><span class="callout__icon">!</span>' +
                       "<span>Отгружаем целыми бухтами — количество округлится вверх до складской бухты.</span></div>"
                     : "") +
-                  (isScrap(s) && !state.auth
-                    ? '<div class="callout callout--warn" style="margin-top:14px"><span class="callout__icon">!</span>' +
-                      "<span>Деловой лом отгружаем только юридическим лицам. Войдите по ИНН.</span></div>"
-                    : "") +
                   (isLong(s)
                     ? '<div class="callout callout--warn" style="margin-top:14px"><span class="callout__icon">!</span>' +
                       "<span>Длина 11,7–12 м: нужен открытый борт или шаланда с верхней погрузкой. Крытая фура не подойдёт.</span></div>"
@@ -1688,18 +1133,17 @@
                       "</div>"
                     : "") +
                   '<div class="row" style="margin-top:20px">' +
-                    '<button class="btn btn--lg" id="addCart"' + (isScrap(s) && !state.auth ? " disabled" : "") + ">В корзину</button>" +
+                    '<button class="btn btn--lg" id="addCart">В корзину</button>' +
                     '<a class="btn btn--lg btn--secondary" href="#/cart">Перейти в корзину</a>' +
                   "</div>" +
                 "</div>"
               : '<div class="panel" style="margin-top:16px">' +
-                  '<h2 style="font-size:1.0625rem">' +
-                    (byReq(s) ? "Поставляем под заказ" : "Сейчас нет на складе " + esc(WH[state.wh].short)) + "</h2>" +
+                  '<h2 style="font-size:1.0625rem">Поставляем под заказ</h2>' +
                   '<p class="small muted" style="margin-top:8px">' +
-                    (byReq(s)
+                    (/арматура|опоры|фланцы/i.test(s.l1)
                       ? "Напишите типоразмер, рабочую среду и давление — вернёмся с ценой, сроком и исполнением. " +
                         "Краны изготавливаем с любой строительной длиной."
-                      : "Привозим под заказ. Оставьте контакт — вернёмся со сроком и ценой на вашу партию.") + "</p>" +
+                      : "Напишите марку, размер и количество — вернёмся с ценой и сроком поставки.") + "</p>" +
                   '<div class="row" style="margin-top:18px">' +
                     '<a class="btn btn--lg" href="#/contacts?item=' + encodeURIComponent(s.id) + '">Запросить срок и цену</a>' +
                     '<a class="btn btn--lg btn--secondary" href="' + attr(TEL) + '">' + icon("phone") + " Позвонить</a>" +
@@ -1923,8 +1367,6 @@
   /* ---- Корзина ---- */
   function viewCart() {
     const rows = cartRows();
-    const metal = rows.filter(function (r) { return !isScrap(r.s); });
-    const scrap = rows.filter(function (r) { return isScrap(r.s); });
     const hold = cartHold(rows);
     const left = state.reserveUntil ? Math.max(0, state.reserveUntil - Date.now()) : 0;
 
@@ -1949,7 +1391,7 @@
         breadcrumbs([{ label: "Главная", href: "/" }, { label: "Корзина" }]) +
         '<div class="section-head">' +
           '<h1 id="pageTitle" tabindex="-1">Корзина</h1>' +
-          '<p class="lead">Склад отгрузки — ' + esc(WH[state.wh].name) + ". Позиции с разных складов отгружаются отдельными заказами.</p>" +
+          '<p class="lead">Проверьте список и количество. По позициям без цены вернёмся с расчётом отдельно.</p>' +
         "</div>" +
 
         '<div class="table-scroll">' +
@@ -1968,9 +1410,11 @@
                   '<td><a class="table__name" href="#/product/' + encodeURIComponent(r.s.id) + '">' + esc(r.s.name) + "</a>" +
                     '<div class="xs muted">' + esc(r.s.gost) + "</div></td>" +
                   '<td class="num" data-l="Тонн">' + fmt2(r.tons) + "</td>" +
-                  '<td class="num" data-l="₽ за тонну">' + fmt(priceNow(r.s)) + "</td>" +
-                  '<td data-l="НДС">' + esc(isScrap(r.s) ? "агент, ст. 161" : "20%") + "</td>" +
-                  '<td class="num" data-l="Сумма">' + fmt(priceNow(r.s) * r.tons) + "</td>" +
+                  '<td class="num" data-l="₽ за тонну">' +
+                    (r.s.p1t ? fmt(priceNow(r.s)) : '<span class="xs price-req">по запросу</span>') + "</td>" +
+                  '<td data-l="НДС">20%</td>' +
+                  '<td class="num" data-l="Сумма">' +
+                    (r.s.p1t ? fmt(priceNow(r.s) * r.tons) : "—") + "</td>" +
                   '<td><button class="btn btn--sm btn--ghost" data-del="' + attr(r.s.id) + '" ' +
                     'aria-label="Убрать ' + attr(r.s.name) + '">Убрать</button></td>' +
                 "</tr>"
@@ -1979,18 +1423,13 @@
             "</tbody></table>" +
         "</div>" +
 
-        '<div class="grid grid--4" style="margin-top:24px">' +
-          '<div class="panel panel--tight"><p class="xs muted">Металл, НДС 20%</p><p class="price" style="margin-top:4px">' + fmt(cartSum(metal)) + " ₽</p></div>" +
-          '<div class="panel panel--tight"><p class="xs muted">Лом, агент ст. 161</p><p class="price" style="margin-top:4px">' + fmt(cartSum(scrap)) + " ₽</p></div>" +
+        '<div class="grid grid--3" style="margin-top:24px">' +
+          '<div class="panel panel--tight"><p class="xs muted">Позиции с ценой, НДС 20%</p><p class="price" style="margin-top:4px">' + fmt(cartSum(rows)) + " ₽</p></div>" +
           '<div class="panel panel--tight"><p class="xs muted">Запас на фактический вес</p><p class="price" style="margin-top:4px">+' + fmt(hold) + " ₽</p></div>" +
           '<div class="panel panel--tight" style="border-color:var(--action)"><p class="xs muted">К резервированию</p>' +
             '<p class="price" style="margin-top:4px;color:var(--action-700)">' + fmt(cartSum(rows) + hold) + " ₽</p></div>" +
         "</div>" +
 
-        (scrap.length && metal.length
-          ? '<div class="callout callout--warn" style="margin-top:20px"><span class="callout__icon">!</span>' +
-            "<span>В заказе есть и металл, и деловой лом — по ним разный НДС, поэтому счёта будет два.</span></div>"
-          : "") +
         (left
           ? '<div class="callout callout--ok" style="margin-top:16px"><span class="callout__icon">✓</span>' +
             '<span>Позиции в резерве, осталось <b class="timer num" id="tm">' + mmss(left) + "</b></span></div>"
@@ -2226,7 +1665,7 @@
             '<div class="panel">' +
               "<h2 style=\"font-size:1.0625rem\">Чем занимаемся</h2>" +
               '<ul class="list-check" style="margin-top:14px">' +
-                "<li>Металлопрокат и трубопроводная арматура со склада</li>" +
+                "<li>Металлопрокат и трубопроводная арматура под заказ</li>" +
                 "<li>Подбор позиций по списку заказчика</li>" +
                 "<li>Резка в размер и упаковка партии</li>" +
                 "<li>Отгрузка юрлицам по счёту с НДС и физлицам с чеком</li>" +
@@ -2276,7 +1715,6 @@
               "<li>Юридическим лицам — счёт с НДС 20%, закрывающие документы и УПД</li>" +
               "<li>Отсрочка платежа — по согласованию с менеджером</li>" +
               "<li>Физическим лицам — карта или СБП, чек по 54-ФЗ</li>" +
-              "<li>Деловой лом идёт отдельным счётом: по нему НДС платит покупатель как налоговый агент, статья 161 НК</li>" +
             "</ul>" +
           "</div>" +
           '<div class="panel">' +
@@ -2608,14 +2046,12 @@
   function render() {
     const root = $("#app");
     if (!root) return;
-    if (heroViewer) { heroViewer.destroy(); heroViewer = null; }
     const view = VIEWS[state.route.name] || viewHome;
     root.innerHTML = header() + '<main id="main">' + view() + "</main>" + footer();
     document.title = pageTitle();
     bind();
     syncCartCount();
     revealInit();
-    heroViewer = initHeroViewer();
     tick();
   }
 
@@ -2721,13 +2157,10 @@
       facetForm.addEventListener("submit", function (e) {
         e.preventDefault();
         const d = new FormData(facetForm);
-        state.wh = d.get("wh") || state.wh;
-        save("sng_wh", state.wh);
         setQuery({
           q: String(d.get("q") || "").trim(),
           l1: d.get("l1") || "",
           l2: d.get("l2") || "",
-          stock: d.get("stock") === "in" ? "in" : "",
           page: ""
         });
       });
@@ -2794,11 +2227,11 @@
     const runDemo = $("#runDemo");
     if (runDemo) runDemo.addEventListener("click", function () {
       state.requestRows = [
-        { src: "Арматура 12 А500С — 4,8 т", dst: "Арматура А500С Ø12 мм, МД 11.7", lvl: "HIGH", id: "ARM-A500-12-MD" },
-        { src: "Лист 10 ст3 — 8 т", dst: "Лист г/к ст3 10 мм, 1500×6000", lvl: "HIGH", id: "SH-HR-ST3-10-1500x6000" },
-        { src: "304-я 2 мм — 1,2 т", dst: "Лист н/ж AISI 304, 2 мм — нужно выбрать отделку", lvl: "MID", id: "SS-304-2-1250x2500-M" },
-        { src: "Обрезь листа ст3 — 2 т", dst: "Деловой лом, лист ст3 · НДС платит покупатель", lvl: "HIGH", id: "SCR-SH-ST3" },
-        { src: "Профтруба 40×20×2 — 1 т", dst: "Нет на складе — подберёт менеджер", lvl: "REJECT", id: "" }
+        { src: "Кран шаровый фл. Ду 10, Ру 16 — 4 шт", dst: "Кран шаровой фланцевый КШ.Ф.10-16", lvl: "HIGH", id: "ARM-KSHF-010" },
+        { src: "304-я 0,5 мм — 1,2 т", dst: "Лист нержавеющий 0.5×1250×2500 08Х18Н10", lvl: "HIGH", id: "SS-304-0_5-1250x2500" },
+        { src: "круг нержа 10 — 300 кг", dst: "Круг нержавеющий Ø10 — уточнить марку: 08Х18Н10 или 12Х18Н10Т", lvl: "MID", id: "SS-RD-304-10" },
+        { src: "кольцо 30ХГСА поковка — по чертежу", dst: "Кольцо 30ХГСА, поковка", lvl: "HIGH", id: "FRG-30HGSA-RING" },
+        { src: "Профтруба 40×20×2 — 1 т", dst: "Нет в номенклатуре — подберёт менеджер", lvl: "REJECT", id: "" }
       ];
       render();
     });
@@ -2810,7 +2243,6 @@
         if (!id) return;
         const s = SKU.find(function (x) { return x.id === id; });
         if (!s) { toast("Позиции нет в каталоге"); return; }
-        if (isScrap(s)) state.auth = true;
         addToCart(id, 1);
       });
     });
