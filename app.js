@@ -397,88 +397,524 @@
     return '<svg viewBox="0 0 68 68" aria-hidden="true" focusable="false">' + inner + "</svg>";
   }
 
-  /* ---------- 4б. Главный кадр ----------
-     Здесь была объёмная модель на canvas (~500 строк своего рендерера с
-     перерисовкой каждый кадр) — убрали, грузила процессор. Потом стоял скан
-     из «Каталога продукции 2015», но это снимок с наклейками на корпусе.
-     Теперь чертёж: рисуется теми же линиями, что профили в каталоге,
-     не требует запроса в сеть и ничего не анимирует.
-     Параметры под чертежом — из specs в data-arm.js, не выдуманные. */
+  /* ---------- 4б. Объёмная сборка изделия ----------
+     Свой маленький рендерер на canvas: без внешних библиотек,
+     чтобы сайт по-прежнему работал без интернета и открывался файлом.
+     Модель не просто вращается — детали прилетают по очереди и собираются
+     в изделие, а свежий срез металла остывает с оранжевого до синего. */
 
-  const HERO_SPECS = [
-    ["Ду", "10–200 мм"],
-    ["Ру", "1,0–16 МПа"],
-    ["Корпус", "ст.20 · 09Г2С · 12Х18Н10Т"],
-    ["Среда", "до 300 °C"],
-    ["Затвор", "класс А, фторопласт"],
-    ["Привод", "редуктор · электро · пневмо"]
+  const SHAPES = [
+    ["valve",  "Кран шаровый", "Кран шаровый фланцевый в сборе"],
+    ["elbow",  "Отвод",  "Отвод 90° с фланцами"],
+    ["flange", "Фланец", "Фланец с крепёжными болтами"],
+    ["bolt",   "Крепёж", "Болт с шайбой и гайкой"]
   ];
+  let heroShape = "valve";
+  let heroViewer = null;
 
-  function valveDrawing() {
-    const ln = 'fill="none" stroke="' + C_LINE + '" stroke-width="2"';
-    const fl = 'fill="rgba(0,145,208,.08)" stroke="' + C_LINE + '" stroke-width="2"';
-    const dim = 'fill="none" stroke="' + C_DIM + '" stroke-width="1"';
-    const dash = 'fill="none" stroke="' + C_DIM + '" stroke-width="1" stroke-dasharray="4 4"';
-    const cap = 'fill="' + C_DIM + '" font-size="11" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" letter-spacing="1"';
-
-    /* болты по фланцу — четыре с каждой стороны */
-    let bolts = "";
-    [74, 98, 122, 146].forEach(function (y) {
-      bolts += '<circle cx="131" cy="' + y + '" r="3.2" ' + ln + "/>" +
-               '<circle cx="269" cy="' + y + '" r="3.2" ' + ln + "/>";
-    });
-
+  function heroViewerHtml() {
+    const cur = SHAPES.filter(function (s) { return s[0] === heroShape; })[0] || SHAPES[0];
     return (
-      '<svg class="hero__draw" viewBox="58 36 300 192" role="img" ' +
-        'aria-label="Чертёж шарового крана с фланцами: строительная длина L, диаметр прохода Ду, высота H">' +
-        /* патрубки */
-        '<rect x="140" y="90" width="22" height="40" ' + fl + "/>" +
-        '<rect x="238" y="90" width="22" height="40" ' + fl + "/>" +
-        /* фланцы */
-        '<rect x="122" y="64" width="18" height="92" rx="3" ' + fl + "/>" +
-        '<rect x="260" y="64" width="18" height="92" rx="3" ' + fl + "/>" +
-        bolts +
-        /* корпус */
-        '<rect x="162" y="72" width="76" height="76" rx="12" ' + fl + "/>" +
-        /* шар и проход */
-        '<circle cx="200" cy="110" r="29" fill="#FFFFFF" stroke="' + C_LINE + '" stroke-width="2"/>' +
-        '<path d="M171 96 h58 M171 124 h58" ' + ln + ' opacity=".55"/>' +
-        /* шток и рукоятка */
-        '<rect x="194" y="52" width="12" height="22" rx="2" ' + fl + "/>" +
-        '<path d="M200 52 h74" ' + ln + "/>" +
-        '<circle cx="273" cy="52" r="5" ' + fl + "/>" +
-        /* размер L — строительная длина */
-        '<path d="M122 196 h156" ' + dim + "/>" +
-        '<path d="M122 190 v12 M278 190 v12" ' + dim + "/>" +
-        '<path d="M122 156 v44 M278 156 v44" ' + dash + "/>" +
-        '<text x="200" y="215" text-anchor="middle" ' + cap + ">L</text>" +
-        /* размер Ду — по проходу */
-        '<path d="M100 96 h62 M100 124 h62" ' + dash + "/>" +
-        '<path d="M106 96 v28" ' + dim + "/>" +
-        '<text x="92" y="114" text-anchor="end" ' + cap + ">Ду</text>" +
-        /* размер H — высота со штоком */
-        '<path d="M330 52 h-52 M330 148 h-62" ' + dash + "/>" +
-        '<path d="M324 52 v96" ' + dim + "/>" +
-        '<text x="338" y="104" ' + cap + ">H</text>" +
-      "</svg>"
-    );
-  }
-
-  function heroFigureHtml() {
-    return (
-      '<figure class="hero__figure hero__figure--draw" style="margin:0">' +
-        valveDrawing() +
-        '<dl class="hero__specs">' +
-          HERO_SPECS.map(function (r) {
-            return "<dt>" + esc(r[0]) + "</dt><dd>" + esc(r[1]) + "</dd>";
+      '<figure class="hero__figure viewer" style="margin:0">' +
+        '<div class="viewer__stage">' +
+          '<canvas class="viewer__canvas" id="heroCanvas" tabindex="0" role="img" ' +
+            'aria-label="Объёмная модель: ' + attr(cur[2]) + '. Потяните мышью или стрелками, чтобы повернуть"></canvas>' +
+          '<span class="viewer__hint" id="heroHint">Потяните, чтобы повернуть</span>' +
+        "</div>" +
+        '<div class="segmented viewer__tabs" role="group" aria-label="Какое изделие показать">' +
+          SHAPES.map(function (s) {
+            return '<button type="button" data-shape="' + attr(s[0]) + '" aria-pressed="' +
+              (s[0] === heroShape ? "true" : "false") + '">' + esc(s[1]) + "</button>";
           }).join("") +
-        "</dl>" +
+        "</div>" +
         '<figcaption class="hero__figcap">' +
-          '<span class="eyebrow">Кран шаровый фланцевый</span>' +
+          '<span class="eyebrow" id="heroCap">' + esc(cur[2]) + "</span>" +
           '<span class="eyebrow">' + esc(pos(SKU.length)) + " в каталоге</span>" +
         "</figcaption>" +
       "</figure>"
     );
+  }
+
+  /* ---- примитивы: всё собирается из четырёх- и многоугольных граней ---- */
+
+  const TAU = Math.PI * 2;
+
+  /* прямоугольный брусок */
+  function boxFaces(x0, y0, z0, x1, y1, z1) {
+    const p = [
+      [x0, y0, z0], [x1, y0, z0], [x1, y1, z0], [x0, y1, z0],
+      [x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1]
+    ];
+    return [[0, 1, 2, 3], [5, 4, 7, 6], [4, 0, 3, 7], [1, 5, 6, 2], [4, 5, 1, 0], [3, 2, 6, 7]]
+      .map(function (f) { return { v: f.map(function (k) { return p[k]; }), soft: false }; });
+  }
+
+  /* труба или сплошной цилиндр вдоль оси Z; r = 0 — сплошной */
+  function tubeFaces(R, r, z0, z1, N) {
+    const f = [];
+    const co = [], ci = [];
+    for (let i = 0; i <= N; i++) {
+      const a = (i / N) * TAU;
+      co.push([R * Math.cos(a), R * Math.sin(a)]);
+      ci.push([r * Math.cos(a), r * Math.sin(a)]);
+    }
+    for (let i = 0; i < N; i++) {
+      const A = co[i], B = co[i + 1];
+      f.push({ v: [[A[0], A[1], z0], [B[0], B[1], z0], [B[0], B[1], z1], [A[0], A[1], z1]], soft: true });
+      if (r > 0) {
+        const a = ci[i], b = ci[i + 1];
+        f.push({ v: [[b[0], b[1], z0], [a[0], a[1], z0], [a[0], a[1], z1], [b[0], b[1], z1]], soft: true });
+        f.push({ v: [[A[0], A[1], z0], [a[0], a[1], z0], [b[0], b[1], z0], [B[0], B[1], z0]], soft: true });
+        f.push({ v: [[A[0], A[1], z1], [B[0], B[1], z1], [b[0], b[1], z1], [a[0], a[1], z1]], soft: true });
+      } else {
+        f.push({ v: [[0, 0, z0], [B[0], B[1], z0], [A[0], A[1], z0]], soft: true });
+        f.push({ v: [[0, 0, z1], [A[0], A[1], z1], [B[0], B[1], z1]], soft: true });
+      }
+    }
+    return f;
+  }
+
+  /* правильная призма вдоль Z — головка болта, гайка */
+  function prismFaces(R, sides, z0, z1) {
+    const f = [], p = [];
+    for (let i = 0; i < sides; i++) {
+      const a = (i / sides) * TAU + Math.PI / sides;
+      p.push([R * Math.cos(a), R * Math.sin(a)]);
+    }
+    for (let i = 0; i < sides; i++) {
+      const A = p[i], B = p[(i + 1) % sides];
+      f.push({ v: [[A[0], A[1], z0], [B[0], B[1], z0], [B[0], B[1], z1], [A[0], A[1], z1]], soft: false });
+    }
+    f.push({ v: p.map(function (q) { return [q[0], q[1], z1]; }), soft: false });
+    f.push({ v: p.slice().reverse().map(function (q) { return [q[0], q[1], z0]; }), soft: false });
+    return f;
+  }
+
+  /* шар запорного элемента */
+  function ballFaces(R, NU, NV) {
+    const f = [];
+    for (let i = 0; i < NV; i++) {
+      const t0 = (i / NV) * Math.PI, t1 = ((i + 1) / NV) * Math.PI;
+      for (let j = 0; j < NU; j++) {
+        const a0 = (j / NU) * TAU, a1 = ((j + 1) / NU) * TAU;
+        const P = function (t, a) {
+          return [R * Math.sin(t) * Math.cos(a), R * Math.cos(t), R * Math.sin(t) * Math.sin(a)];
+        };
+        f.push({ v: [P(t0, a0), P(t0, a1), P(t1, a1), P(t1, a0)], soft: true });
+      }
+    }
+    return f;
+  }
+
+  /* дуга трубы в плоскости XY — отвод */
+  function arcTubeFaces(bendR, R, r, a0, a1, NA, NC) {
+    const f = [];
+    const pt = function (a, phi, rad) {
+      const u = [Math.cos(a), Math.sin(a), 0];
+      return [
+        bendR * u[0] + rad * Math.cos(phi) * u[0],
+        bendR * u[1] + rad * Math.cos(phi) * u[1],
+        rad * Math.sin(phi)
+      ];
+    };
+    for (let i = 0; i < NA; i++) {
+      const A = a0 + (a1 - a0) * (i / NA), B = a0 + (a1 - a0) * ((i + 1) / NA);
+      for (let j = 0; j < NC; j++) {
+        const p0 = (j / NC) * TAU, p1 = ((j + 1) / NC) * TAU;
+        f.push({ v: [pt(A, p0, R), pt(B, p0, R), pt(B, p1, R), pt(A, p1, R)], soft: true });
+        f.push({ v: [pt(A, p1, r), pt(B, p1, r), pt(B, p0, r), pt(A, p0, r)], soft: true });
+      }
+    }
+    for (let j = 0; j < NC; j++) {
+      const p0 = (j / NC) * TAU, p1 = ((j + 1) / NC) * TAU;
+      f.push({ v: [pt(a0, p0, R), pt(a0, p1, R), pt(a0, p1, r), pt(a0, p0, r)], soft: true });
+      f.push({ v: [pt(a1, p0, r), pt(a1, p1, r), pt(a1, p1, R), pt(a1, p0, R)], soft: true });
+    }
+    return f;
+  }
+
+  /* ---- преобразования готовых наборов граней ---- */
+
+  function mapPts(faces, fn) {
+    return faces.map(function (f) { return { v: f.v.map(fn), soft: f.soft }; });
+  }
+  function moveF(faces, dx, dy, dz) {
+    return mapPts(faces, function (p) { return [p[0] + dx, p[1] + dy, p[2] + dz]; });
+  }
+  /* поворот заготовки, построенной вдоль Z, на другую ось */
+  function alongX(faces) { return mapPts(faces, function (p) { return [p[2], p[1], -p[0]]; }); }
+  function alongY(faces) { return mapPts(faces, function (p) { return [p[0], p[2], -p[1]]; }); }
+
+  /* деталь сборки: откуда прилетает, когда и с каким доворотом */
+  function part(faces, from, t0, t1, rot, pivot, axis) {
+    return {
+      faces: faces, from: from || [0, 0, 0], t0: t0, t1: t1,
+      rot: rot || 0, pivot: pivot || [0, 0, 0], axis: axis || "z"
+    };
+  }
+
+  function buildShape(kind) {
+    if (kind === "elbow") {
+      const B = 152, R = 46, r = 31, NC = 14;
+      const seg = [];
+      for (let i = 0; i < 4; i++) {
+        const a0 = (Math.PI / 2) * (i / 4), a1 = (Math.PI / 2) * ((i + 1) / 4);
+        seg.push(part(arcTubeFaces(B, R, r, a0, a1, 4, NC),
+          [0, 0, 210], 0.02 + i * 0.12, 0.26 + i * 0.12));
+      }
+      return seg.concat([
+        part(moveF(alongY(tubeFaces(R, r, 0, 62, NC)), B, -62, 0), [0, -250, 0], 0.50, 0.72),
+        part(moveF(alongX(tubeFaces(R, r, 0, 62, NC)), -62, B, 0), [-250, 0, 0], 0.56, 0.78),
+        part(moveF(alongY(tubeFaces(84, r, 0, 24, 20)), B, -86, 0), [0, -300, 0], 0.70, 0.90),
+        part(moveF(alongX(tubeFaces(84, r, 0, 24, 20)), -86, B, 0), [-300, 0, 0], 0.78, 1.00)
+      ]);
+    }
+
+    if (kind === "flange") {
+      const list = [
+        part(tubeFaces(126, 46, -18, 18, 22), [0, 0, 300], 0.00, 0.26),
+        part(tubeFaces(76, 46, 18, 56, 20), [0, 0, 240], 0.18, 0.42),
+        part(tubeFaces(60, 46, 56, 92, 20), [0, 0, 220], 0.28, 0.52)
+      ];
+      const NB = 8;
+      for (let i = 0; i < NB; i++) {
+        const a = (i / NB) * TAU + Math.PI / NB;
+        const x = 96 * Math.cos(a), y = 96 * Math.sin(a);
+        const bolt = moveF(tubeFaces(11, 0, -40, 34, 10), x, y, 0)
+          .concat(moveF(prismFaces(19, 6, 34, 54), x, y, 0));
+        list.push(part(bolt, [0, 0, 200], 0.44 + i * 0.05, 0.64 + i * 0.05, -2.4, [x, y, 0]));
+      }
+      return list;
+    }
+
+    if (kind === "bolt") {
+      return [
+        part(alongX(tubeFaces(27, 0, -160, 116, 18)), [-300, 0, 0], 0.00, 0.26),
+        part(alongX(prismFaces(54, 6, 116, 176)), [300, 0, 0], 0.18, 0.44),
+        part(alongX(tubeFaces(64, 29, -106, -86, 20)), [-300, 0, 0], 0.40, 0.64),
+        part(alongX(prismFaces(52, 6, -86, -34)), [-330, 0, 0], 0.60, 1.00, -6.3, [0, 0, 0], "x")
+      ];
+    }
+
+    if (kind === "beam") {
+      const L = 150;
+      return [
+        part(boxFaces(-6, -86, -L, 6, 86, L), [0, 0, 240], 0.00, 0.30),
+        part(boxFaces(-56, 86, -L, 56, 100, L), [0, 230, 0], 0.22, 0.56),
+        part(boxFaces(-56, -100, -L, 56, -86, L), [0, -230, 0], 0.40, 0.76)
+      ];
+    }
+
+    /* кран шаровой фланцевый — по умолчанию */
+    const NP = 20;
+    return [
+      part(ballFaces(60, 12, 8), [0, 250, 0], 0.00, 0.22),
+      part(alongX(tubeFaces(78, 0, -92, 92, 22)), [0, 0, 260], 0.14, 0.40),
+      part(alongX(tubeFaces(48, 31, -156, -92, NP)), [-280, 0, 0], 0.30, 0.54),
+      part(alongX(tubeFaces(48, 31, 92, 156, NP)), [280, 0, 0], 0.30, 0.54),
+      part(alongX(tubeFaces(92, 31, -176, -156, NP)), [-330, 0, 0], 0.46, 0.70),
+      part(alongX(tubeFaces(92, 31, 156, 176, NP)), [330, 0, 0], 0.46, 0.70),
+      part(alongY(tubeFaces(17, 0, 66, 140, 14)), [0, 280, 0], 0.60, 0.80),
+      part(
+        boxFaces(-14, 140, -15, 150, 162, 15).concat(moveF(alongX(tubeFaces(19, 0, -10, 10, 12)), 150, 151, 0)),
+        [0, 120, 0], 0.74, 1.00, -1.15, [0, 140, 0]
+      )
+    ];
+  }
+
+  function initHeroViewer() {
+    const canvas = document.getElementById("heroCanvas");
+    if (!canvas || !canvas.getContext) return null;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+
+    const hint = document.getElementById("heroHint");
+    const cap = document.getElementById("heroCap");
+    const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    const LIGHT = (function () {
+      const v = [-0.34, 0.60, 0.72], m = Math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
+      return [v[0] / m, v[1] / m, v[2] / m];
+    })();
+    const DARK = [0, 88, 132], BASE = [0, 145, 208], LITE = [122, 210, 246];
+    const HOT = [231, 128, 52];
+    const mixc = function (c1, c2, t) {
+      return [
+        Math.round(c1[0] + (c2[0] - c1[0]) * t),
+        Math.round(c1[1] + (c2[1] - c1[1]) * t),
+        Math.round(c1[2] + (c2[2] - c1[2]) * t)
+      ];
+    };
+    const rgb = function (c) { return "rgb(" + c[0] + "," + c[1] + "," + c[2] + ")"; };
+    const tone = function (t, hot) {
+      let c = t < 0.5 ? mixc(DARK, BASE, t * 2) : mixc(BASE, LITE, (t - 0.5) * 2);
+      if (hot > 0) c = mixc(c, HOT, hot * 0.92);
+      return rgb(c);
+    };
+
+    const ASM_MS = 2800;
+    let parts = buildShape(heroShape);
+    let asmFrom = 0, asm = reduce ? 1 : 0;
+    let modelR = 1;
+
+    function measure() {
+      modelR = 1;
+      parts.forEach(function (pt) {
+        pt.faces.forEach(function (f) {
+          f.v.forEach(function (p) {
+            const d = Math.sqrt(p[0] * p[0] + p[1] * p[1] + p[2] * p[2]);
+            if (d > modelR) modelR = d;
+          });
+        });
+      });
+    }
+    measure();
+
+    /* у каждого изделия свой стартовый ракурс — так форма читается лучше всего */
+    const START = {
+      valve:  [-0.30, 0.58],
+      elbow:  [-0.30, 0.40],
+      flange: [-0.40, 0.66],
+      bolt:   [-0.34, 0.52],
+      beam:   [-0.34, 0.62]
+    };
+    const startAngles = function () { return START[heroShape] || START.valve; };
+    let rotX = startAngles()[0], rotY = startAngles()[1];
+    let auto = !reduce, dragging = false, touched = false;
+    let lastX = 0, lastY = 0, raf = 0, w = 0, h = 0, dpr = 1;
+    let visible = true, alive = true, needs = true;
+
+    function restart() {
+      asm = reduce ? 1 : 0;
+      asmFrom = (window.performance && performance.now) ? performance.now() : Date.now();
+      needs = true;
+    }
+    restart();
+
+    function resize() {
+      const rect = canvas.getBoundingClientRect();
+      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      w = Math.max(1, Math.round(rect.width));
+      h = Math.max(1, Math.round(rect.height));
+      canvas.width = Math.round(w * dpr);
+      canvas.height = Math.round(h * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      needs = true;
+    }
+
+    const easeOut = function (t) { return 1 - Math.pow(1 - t, 3); };
+
+    function draw() {
+      ctx.clearRect(0, 0, w, h);
+      if (w < 8 || h < 8) return;
+
+      const cam = 760, focal = 680;
+      const scale = (Math.min(w, h) * 0.42) / (modelR * (focal / cam));
+      const ox = w / 2, oy = h / 2;
+      const cx = Math.cos(rotX), sx = Math.sin(rotX);
+      const cy = Math.cos(rotY), sy = Math.sin(rotY);
+
+      const sh = ctx.createRadialGradient(ox, h * 0.9, 1, ox, h * 0.9, Math.min(w, h) * 0.42);
+      sh.addColorStop(0, "rgba(17,26,32,.16)");
+      sh.addColorStop(1, "rgba(17,26,32,0)");
+      ctx.fillStyle = sh;
+      ctx.beginPath();
+      ctx.ellipse(ox, h * 0.9, Math.min(w, h) * 0.40, Math.min(w, h) * 0.072, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      const list = [];
+      for (let n = 0; n < parts.length; n++) {
+        const pt = parts[n];
+        const raw = pt.t1 > pt.t0 ? (asm - pt.t0) / (pt.t1 - pt.t0) : 1;
+        const p = Math.max(0, Math.min(1, raw));
+        if (p <= 0) continue;
+        const e = easeOut(p);
+        const k = 1 - e;                       /* 1 — деталь ещё в полёте, 0 — на месте */
+        const alpha = Math.min(1, p * 4);
+        const hot = Math.pow(1 - p, 1.5);      /* свежий срез остывает */
+        const ca = Math.cos(pt.rot * k), sa = Math.sin(pt.rot * k);
+        const ax = pt.axis;
+
+        for (let i = 0; i < pt.faces.length; i++) {
+          const src = pt.faces[i].v, pts = [];
+          let zs = 0;
+          for (let j = 0; j < src.length; j++) {
+            let X = src[j][0], Y = src[j][1], Z = src[j][2];
+            if (pt.rot) {
+              if (ax === "x") {
+                const dy = Y - pt.pivot[1], dz = Z - pt.pivot[2];
+                Y = pt.pivot[1] + dy * ca - dz * sa;
+                Z = pt.pivot[2] + dy * sa + dz * ca;
+              } else if (ax === "y") {
+                const dz = Z - pt.pivot[2], dx2 = X - pt.pivot[0];
+                Z = pt.pivot[2] + dz * ca - dx2 * sa;
+                X = pt.pivot[0] + dz * sa + dx2 * ca;
+              } else {
+                const dx = X - pt.pivot[0], dy = Y - pt.pivot[1];
+                X = pt.pivot[0] + dx * ca - dy * sa;
+                Y = pt.pivot[1] + dx * sa + dy * ca;
+              }
+            }
+            X += pt.from[0] * k; Y += pt.from[1] * k; Z += pt.from[2] * k;
+            const x1 = X * cy + Z * sy;
+            const z1 = -X * sy + Z * cy;
+            const y2 = Y * cx - z1 * sx;
+            const z2 = Y * sx + z1 * cx;
+            pts.push([x1, y2, z2]);
+            zs += z2;
+          }
+          list.push({ pts: pts, z: zs / src.length, soft: pt.faces[i].soft, a: alpha, hot: hot });
+        }
+      }
+      list.sort(function (p, q) { return p.z - q.z; });
+
+      ctx.lineJoin = "round";
+      for (let i = 0; i < list.length; i++) {
+        const it = list[i], pts = it.pts;
+        const ax = pts[1][0] - pts[0][0], ay = pts[1][1] - pts[0][1], az = pts[1][2] - pts[0][2];
+        const bx = pts[2][0] - pts[0][0], by = pts[2][1] - pts[0][1], bz = pts[2][2] - pts[0][2];
+        let nx = ay * bz - az * by, ny = az * bx - ax * bz, nz = ax * by - ay * bx;
+        const nm = Math.sqrt(nx * nx + ny * ny + nz * nz) || 1;
+        nx /= nm; ny /= nm; nz /= nm;
+        if (nz < 0) { nx = -nx; ny = -ny; nz = -nz; }
+        const dot = Math.max(0, nx * LIGHT[0] + ny * LIGHT[1] + nz * LIGHT[2]);
+
+        ctx.globalAlpha = it.a;
+        ctx.beginPath();
+        for (let j = 0; j < pts.length; j++) {
+          const p = pts[j];
+          const k = focal / (cam - p[2]);
+          const X = ox + p[0] * k * scale;
+          const Y = oy - p[1] * k * scale;
+          if (j === 0) ctx.moveTo(X, Y); else ctx.lineTo(X, Y);
+        }
+        ctx.closePath();
+        const fill = tone(0.14 + 0.86 * dot, it.hot);
+        ctx.fillStyle = fill;
+        ctx.fill();
+        /* на круглых поверхностях обводим цветом заливки — иначе видны швы сегментов */
+        ctx.lineWidth = it.hot > 0.04 ? 1.6 : 1;
+        ctx.strokeStyle = it.hot > 0.04
+          ? rgb(mixc([11, 16, 20], HOT, Math.min(1, it.hot + 0.35)))
+          : (it.soft ? fill : "rgba(11,16,20,.20)");
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    function loop() {
+      if (!alive) return;
+      const on = visible && !document.hidden;
+      if (on && asm < 1) {
+        const now = (window.performance && performance.now) ? performance.now() : Date.now();
+        asm = Math.min(1, (now - asmFrom) / ASM_MS);
+        needs = true;
+      }
+      if (auto && on) { rotY += 0.0042; needs = true; }
+      if (needs && on) { draw(); needs = false; }
+      raf = requestAnimationFrame(loop);
+    }
+
+    function stopAuto() {
+      if (!touched) {
+        touched = true;
+        auto = false;
+        if (hint) hint.hidden = true;
+      }
+    }
+
+    /* Перетаскивание слушаем на окне: так вращение не обрывается,
+       если курсор или палец ушёл за пределы модели. */
+    function onMove(e) {
+      if (!dragging) return;
+      rotY += (e.clientX - lastX) * 0.009;
+      rotX += (e.clientY - lastY) * 0.007;
+      rotX = Math.max(-1.25, Math.min(1.25, rotX));
+      lastX = e.clientX; lastY = e.clientY;
+      needs = true;
+      if (e.cancelable) e.preventDefault();
+    }
+    function onUp() {
+      if (!dragging) return;
+      dragging = false;
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+    }
+    function onDown(e) {
+      dragging = true;
+      stopAuto();
+      lastX = e.clientX; lastY = e.clientY;
+      window.addEventListener("pointermove", onMove, { passive: false });
+      window.addEventListener("pointerup", onUp);
+      window.addEventListener("pointercancel", onUp);
+    }
+
+    function onKey(e) {
+      const step = 0.16;
+      if (e.key === "ArrowLeft") rotY -= step;
+      else if (e.key === "ArrowRight") rotY += step;
+      else if (e.key === "ArrowUp") rotX = Math.max(-1.25, rotX - step);
+      else if (e.key === "ArrowDown") rotX = Math.min(1.25, rotX + step);
+      else if (e.key === "Enter" || e.key === " ") { restart(); e.preventDefault(); return; }
+      else return;
+      e.preventDefault();
+      stopAuto();
+      needs = true;
+    }
+
+    canvas.addEventListener("pointerdown", onDown);
+    canvas.addEventListener("keydown", onKey);
+
+    let ro = null;
+    if ("ResizeObserver" in window) {
+      ro = new ResizeObserver(resize);
+      ro.observe(canvas);
+    } else window.addEventListener("resize", resize);
+
+    let io = null;
+    if ("IntersectionObserver" in window) {
+      io = new IntersectionObserver(function (entries) {
+        visible = entries[0].isIntersecting;
+        if (visible) needs = true;
+      }, { threshold: 0.05 });
+      io.observe(canvas);
+    }
+
+    $$("[data-shape]").forEach(function (b) {
+      b.addEventListener("click", function () {
+        /* повторное нажатие на активную вкладку пересобирает изделие заново */
+        heroShape = b.dataset.shape;
+        parts = buildShape(heroShape);
+        measure();
+        rotX = startAngles()[0]; rotY = startAngles()[1];
+        restart();
+        $$("[data-shape]").forEach(function (x) {
+          x.setAttribute("aria-pressed", x.dataset.shape === heroShape ? "true" : "false");
+        });
+        const cur = SHAPES.filter(function (s) { return s[0] === heroShape; })[0];
+        if (cap && cur) cap.textContent = cur[2];
+        if (cur) canvas.setAttribute("aria-label",
+          "Объёмная модель: " + cur[2] + ". Потяните мышью или стрелками, чтобы повернуть");
+      });
+    });
+
+    resize();
+    loop();
+
+    return {
+      destroy: function () {
+        alive = false;
+        if (raf) cancelAnimationFrame(raf);
+        if (ro) ro.disconnect(); else window.removeEventListener("resize", resize);
+        if (io) io.disconnect();
+        canvas.removeEventListener("pointerdown", onDown);
+        canvas.removeEventListener("keydown", onKey);
+        window.removeEventListener("pointermove", onMove);
+        window.removeEventListener("pointerup", onUp);
+        window.removeEventListener("pointercancel", onUp);
+      }
+    };
   }
 
   function icon(name) {
@@ -738,7 +1174,7 @@
               '<span class="chip">Самовывоз и доставка</span>' +
             "</div>" +
           "</div>" +
-          '<div class="hero__aside">' + heroFigureHtml() + "</div>" +
+          '<div class="hero__aside">' + heroViewerHtml() + "</div>" +
         "</div>" +
         '<div class="container"><div class="trust">' +
           '<div class="trust__item"><div class="trust__v">с ' + esc(String(CO.since)) + "</div><div class=\"trust__l\">" + YEARS + " лет в ЕГРЮЛ</div></div>" +
@@ -2111,12 +2547,14 @@
   function render() {
     const root = $("#app");
     if (!root) return;
+    if (heroViewer) { heroViewer.destroy(); heroViewer = null; }
     const view = VIEWS[state.route.name] || viewHome;
     root.innerHTML = header() + '<main id="main">' + view() + "</main>" + footer();
     document.title = pageTitle();
     bind();
     syncCartCount();
     revealInit();
+    heroViewer = initHeroViewer();
     tick();
   }
 
