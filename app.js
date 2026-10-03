@@ -398,18 +398,83 @@
   }
 
   /* ---------- 4б. Главный кадр ----------
-     Раньше здесь крутилась объёмная модель на canvas: ~500 строк своего
-     рендерера и анимация в каждом кадре. Убрали по просьбе заказчика —
-     на слабых машинах она грузила процессор, а пользы давала мало.
-     Вместо неё снимок изделия из «Каталога продукции 2015». */
+     Здесь была объёмная модель на canvas (~500 строк своего рендерера с
+     перерисовкой каждый кадр) — убрали, грузила процессор. Потом стоял скан
+     из «Каталога продукции 2015», но это снимок с наклейками на корпусе.
+     Теперь чертёж: рисуется теми же линиями, что профили в каталоге,
+     не требует запроса в сеть и ничего не анимирует.
+     Параметры под чертежом — из specs в data-arm.js, не выдуманные. */
+
+  const HERO_SPECS = [
+    ["Ду", "10–200 мм"],
+    ["Ру", "1,0–16 МПа"],
+    ["Корпус", "ст.20 · 09Г2С · 12Х18Н10Т"],
+    ["Среда", "до 300 °C"],
+    ["Затвор", "класс А, фторопласт"],
+    ["Привод", "редуктор · электро · пневмо"]
+  ];
+
+  function valveDrawing() {
+    const ln = 'fill="none" stroke="' + C_LINE + '" stroke-width="2"';
+    const fl = 'fill="rgba(0,145,208,.08)" stroke="' + C_LINE + '" stroke-width="2"';
+    const dim = 'fill="none" stroke="' + C_DIM + '" stroke-width="1"';
+    const dash = 'fill="none" stroke="' + C_DIM + '" stroke-width="1" stroke-dasharray="4 4"';
+    const cap = 'fill="' + C_DIM + '" font-size="11" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" letter-spacing="1"';
+
+    /* болты по фланцу — четыре с каждой стороны */
+    let bolts = "";
+    [74, 98, 122, 146].forEach(function (y) {
+      bolts += '<circle cx="131" cy="' + y + '" r="3.2" ' + ln + "/>" +
+               '<circle cx="269" cy="' + y + '" r="3.2" ' + ln + "/>";
+    });
+
+    return (
+      '<svg class="hero__draw" viewBox="58 36 300 192" role="img" ' +
+        'aria-label="Чертёж шарового крана с фланцами: строительная длина L, диаметр прохода Ду, высота H">' +
+        /* патрубки */
+        '<rect x="140" y="90" width="22" height="40" ' + fl + "/>" +
+        '<rect x="238" y="90" width="22" height="40" ' + fl + "/>" +
+        /* фланцы */
+        '<rect x="122" y="64" width="18" height="92" rx="3" ' + fl + "/>" +
+        '<rect x="260" y="64" width="18" height="92" rx="3" ' + fl + "/>" +
+        bolts +
+        /* корпус */
+        '<rect x="162" y="72" width="76" height="76" rx="12" ' + fl + "/>" +
+        /* шар и проход */
+        '<circle cx="200" cy="110" r="29" fill="#FFFFFF" stroke="' + C_LINE + '" stroke-width="2"/>' +
+        '<path d="M171 96 h58 M171 124 h58" ' + ln + ' opacity=".55"/>' +
+        /* шток и рукоятка */
+        '<rect x="194" y="52" width="12" height="22" rx="2" ' + fl + "/>" +
+        '<path d="M200 52 h74" ' + ln + "/>" +
+        '<circle cx="273" cy="52" r="5" ' + fl + "/>" +
+        /* размер L — строительная длина */
+        '<path d="M122 196 h156" ' + dim + "/>" +
+        '<path d="M122 190 v12 M278 190 v12" ' + dim + "/>" +
+        '<path d="M122 156 v44 M278 156 v44" ' + dash + "/>" +
+        '<text x="200" y="215" text-anchor="middle" ' + cap + ">L</text>" +
+        /* размер Ду — по проходу */
+        '<path d="M100 96 h62 M100 124 h62" ' + dash + "/>" +
+        '<path d="M106 96 v28" ' + dim + "/>" +
+        '<text x="92" y="114" text-anchor="end" ' + cap + ">Ду</text>" +
+        /* размер H — высота со штоком */
+        '<path d="M330 52 h-52 M330 148 h-62" ' + dash + "/>" +
+        '<path d="M324 52 v96" ' + dim + "/>" +
+        '<text x="338" y="104" ' + cap + ">H</text>" +
+      "</svg>"
+    );
+  }
 
   function heroFigureHtml() {
     return (
-      '<figure class="hero__figure hero__figure--shot" style="margin:0">' +
-        '<img class="hero__shot" src="assets/photo/kran-flancevyj.jpg" alt="Кран шаровый фланцевый" ' +
-          'width="900" height="600" decoding="async" />' +
+      '<figure class="hero__figure hero__figure--draw" style="margin:0">' +
+        valveDrawing() +
+        '<dl class="hero__specs">' +
+          HERO_SPECS.map(function (r) {
+            return "<dt>" + esc(r[0]) + "</dt><dd>" + esc(r[1]) + "</dd>";
+          }).join("") +
+        "</dl>" +
         '<figcaption class="hero__figcap">' +
-          '<span class="eyebrow">Кран шаровый фланцевый в сборе</span>' +
+          '<span class="eyebrow">Кран шаровый фланцевый</span>' +
           '<span class="eyebrow">' + esc(pos(SKU.length)) + " в каталоге</span>" +
         "</figcaption>" +
       "</figure>"

@@ -464,12 +464,18 @@ a.card__title:hover { color: var(--action); }
 .hero__figure svg { position: relative; width: 100%; height: auto; }
 .hero__figcap { position: relative; margin-top: var(--s-4); display: flex; justify-content: space-between; gap: var(--s-3); flex-wrap: wrap; }
 
-/* снимок изделия в первом экране (раньше здесь была объёмная модель) */
-.hero__figure--shot { background: #FFFFFF; padding: var(--s-4); }
-.hero__figure--shot::before { content: none; }
-.hero__shot {
-  position: relative; z-index: 1; display: block;
-  width: 100%; height: auto; max-height: 340px; object-fit: contain;
+/* чертёж изделия в первом экране (раньше здесь была объёмная модель) */
+.hero__draw { position: relative; z-index: 1; display: block; width: 100%; height: auto; }
+.hero__specs {
+  position: relative; z-index: 1; margin: var(--s-4) 0 0;
+  display: grid; grid-template-columns: auto 1fr; gap: 7px var(--s-3);
+  font-size: var(--fs-xs); line-height: 1.45;
+}
+.hero__specs dt { color: var(--muted); white-space: nowrap; }
+.hero__specs dd { margin: 0; color: var(--ink-2); }
+@media (max-width: 359px) {
+  .hero__specs { grid-template-columns: 1fr; gap: 2px; }
+  .hero__specs dt { margin-top: 8px; }
 }
 
 .trust { display: grid; gap: 1px; background: var(--line-2); border-block: 1px solid var(--line-2); grid-template-columns: 1fr 1fr; }
